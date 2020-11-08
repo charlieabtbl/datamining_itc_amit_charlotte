@@ -1,4 +1,6 @@
-# datamining_itc_amit_charlotte
+# Data Mining Project
+Git project repository:
+https://github.com/charlieabtbl/datamining_itc_amit_charlotte.git
 
 
 ## Choice of website
