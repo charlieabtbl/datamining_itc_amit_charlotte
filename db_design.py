@@ -19,6 +19,7 @@ with contextlib.closing(sqlite3.connect(DB)) as con:  # auto-closes
                             idRatings INTEGER PRIMARY KEY AUTOINCREMENT, 
                             Culture_values REAL,
                             Work_life_bal REAL,
+                            Diversity_inclusion REAL,
                             Senior_mngt REAL,
                             Benefits REAL,
                             Career_opportunities REAL,
@@ -26,7 +27,6 @@ with contextlib.closing(sqlite3.connect(DB)) as con:  # auto-closes
         cur.execute('''CREATE TABLE Company (
                             idCompany INTEGER PRIMARY KEY AUTOINCREMENT, 
                             Company_name TEXT NOT NULL,
-                            Website TEXT,
                             Size_est TEXT,
                             Revenue_est TEXT,
                             Industry TEXT,

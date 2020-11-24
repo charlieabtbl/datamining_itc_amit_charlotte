@@ -89,7 +89,7 @@ class ScraperManager:
         options.add_argument('--incognito')
         # options.add_argument('--headless')
 
-        driver = webdriver.Chrome(executable_path='/Users/charlotteabitbol/PycharmProjects/datamining_itc_amit_charlotte/chromedriver', options=options)
+        driver = webdriver.Chrome(executable_path='chromedriver', options=options)
         driver.get(self._base_url)
 
         self._bypass_login(driver)
@@ -380,3 +380,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def
