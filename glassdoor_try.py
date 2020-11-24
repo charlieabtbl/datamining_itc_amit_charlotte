@@ -1,3 +1,4 @@
+
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
@@ -88,7 +89,7 @@ class ScraperManager:
         options.add_argument('--incognito')
         # options.add_argument('--headless')
 
-        driver = webdriver.Chrome(executable_path='chromedriver.exe', options=options)
+        driver = webdriver.Chrome(executable_path='/Users/charlotteabitbol/PycharmProjects/datamining_itc_amit_charlotte/chromedriver', options=options)
         driver.get(self._base_url)
 
         self._bypass_login(driver)
@@ -321,8 +322,9 @@ def parse_args():
     parser.add_argument('-v', '--verbose', action='store_true',
                         help="Optional - Choose either printing output to std or not")
 
-    # args = parser.parse_args()
+    #args = parser.parse_args()
     args = parser.parse_args(['-jt', 'Data Analyst', '-n', '100', '-p', 'res.csv'])
+
 
     return args
 
