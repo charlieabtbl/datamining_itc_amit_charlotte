@@ -287,13 +287,13 @@ class Job:
         raw_rating_values = self._driver.find_elements_by_xpath(
             './/div[@class="stars"]/ul/li/span[@class="ratingValue"]/span[@class="ratingNum"]')
 
-        rating_values = tuple(map(lambda item: int(item.text), raw_rating_values))
+        rating_values = tuple(map(lambda item: float(item.text), raw_rating_values))
 
         self.ratings = dict(zip(rating_parameters, rating_values))
+        if len(self.ratings):
+            overall_rating = float(round(sum(self.ratings.values()) / len(self.ratings), 2))
 
-        overall_rating = float(round(sum(self.ratings.values()) / len(self.ratings), 2))
-
-        self.ratings['Overall Rating'] = overall_rating
+            self.ratings['Overall Rating'] = overall_rating
 
 
 def parse_args():
