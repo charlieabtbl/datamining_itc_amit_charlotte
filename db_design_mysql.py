@@ -1,96 +1,63 @@
 import mysql.connector
 
-# Constants
-DB_NAME = 'glassdoor'
-
 # Creating a list of tables
 tables = []
-
-job_description = '''CREATE TABLE Job_description (
-                            idJob_description int AUTO_INCREMENT, 
-                            Description TEXT,
-                            PRIMARY KEY(idJob_description);'''
-tables.append(job_description)
-job_ratings = ''''CREATE TABLE Ratings (
-                            idRatings int AUTO_INCREMENT, 
-                            Culture_values float,
-                            Diversity_inclusion float,
-                            Work_life_bal float,
-                            Senior_mngt float,
-                            Benefits float,
-                            Career_opportunities float,
-                            Overall_rating float,
-                            PRIMARY KEY(idRatings) );'''
+job_ratings = '''CREATE TABLE Ratings(idRatings INT NOT NULL AUTO_INCREMENT PRIMARY KEY, Culture_values float, 
+Diversity_inclusion float, Work_life_bal float, Senior_mngt float,  Benefits float, Career_opportunities float, 
+Overall_rating float)'''
 tables.append(job_ratings)
-
-company= '''CREATE TABLE Company (
-                            idCompany int AUTO_INCREMENT, 
-                            Company_name TEXT NOT NULL,
-                            Size_est TEXT,
-                            Revenue_est TEXT,
-                            Industry TEXT,
-                            idRatings int,
-                            PRIMARY KEY(idCompany),
-                            FOREIGN KEY(idRatings) REFERENCES Ratings(idRatings));'''
+company = '''CREATE TABLE Company(idCompany INT NOT NULL AUTO_INCREMENT PRIMARY KEY, Company_name VARCHAR(25) NOT 
+NULL, Size_est VARCHAR(25), Revenue_est VARCHAR(25), Industry VARCHAR(25), idRatings INT, FOREIGN KEY(idRatings) 
+REFERENCES Ratings(idRatings))'''
 tables.append(company)
-job_post = '''CREATE TABLE Job_post (
-                            idJob_post int AUTO_INCREMENT, 
-                            Title TEXT NOT NULL,
-                            Salary_range TEXT,
-                            idJob_description INT,
-                            idCompany INT,
-                            PRIMARY KEY(idJob_post)
-                            FOREIGN KEY (idJob_description) REFERENCES Job_description(idJob_description),
-                            FOREIGN KEY (idCompany) REFERENCES Company(idCompany));'''
+job_post = '''CREATE TABLE Job_post(idJob_post INT NOT NULL AUTO_INCREMENT PRIMARY KEY, Title VARCHAR(25) NOT NULL, 
+Salary_range VARCHAR(30), idCompany INT, FOREIGN KEY (idCompany) REFERENCES Company(
+idCompany))'''
 tables.append(job_post)
-
-job_location = '''CREATE TABLE Job_location (
-                            idJob_location int AUTO_INCREMENT, 
-                            City TEXT,
-                            State TEXT,
-                            PRIMARY KEY(idJob_location));'''
+job_location = '''CREATE TABLE Job_location(idJob_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY, City VARCHAR(25), 
+State VARCHAR(10))'''
 tables.append(job_location)
-
-job_post_location = '''CREATE TABLE Job_post_location (
-                            idJob_post_location int AUTO_INCREMENT, 
-                            idJob_post INT,
-                            idJob_location INT,
-                            PRIMARY KEY(idJob_post_location),
-                            FOREIGN KEY (idJob_post) REFERENCES Job_post(idJob_post),
-                            FOREIGN KEY (idJob_location) REFERENCES Job_location(idJob_location));'''
+job_post_location = '''CREATE TABLE Job_post_location(idJob_post_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY,  
+idJob_post INT, idJob_location INT, FOREIGN KEY (idJob_post) REFERENCES Job_post(idJob_post), FOREIGN KEY (
+idJob_location) REFERENCES Job_location(idJob_location))'''
 tables.append(job_post_location)
-
-
 # Building the database
+
 def create_database(host_name, user_name, password):
-    mydb = mysql.connector.connect(
-        host_name="localhost",
-        user_name="root",
-        password="Cabtbl-20"
-    )
-    mycursor = mydb.cursor()
+    '''Define the connection and the cursor that is used for executing the SQL commands and
+    creates the database glassdoor'''
 
-    mycursor.execute("CREATE DATABASE glassdoor")
-
-
-def build_database(db_name, host_name, user_name, password, tables):
-    '''Define the connection and the cursor that is used for executing the SQL commands'''
-
-    my_db = mysql.connector.connect(host=host_name, user=user_name, passwd=password, database=db_name)
+    # Connecting to the database
+    my_db = mysql.connector.connect(host=host_name, user=user_name, passwd=password)
     cursor = my_db.cursor()
 
+    # Making sure the database 'glassdoor' doesn't exist
+    cursor.execute("SHOW DATABASES")
+    databases = cursor.fetchall()
+    if ('glassdoor_db',) not in databases:
+        cursor.execute("CREATE DATABASE glassdoor_db")
+        print('glassdoor_db was created')
+    else:
+        print('glassdoor_db already exists')
+    cursor.close()
+    my_db.close()
+
+
+def create_tables(host_name, user_name, password, db_name, tables):
+    my_db = mysql.connector.connect(host=host_name, user=user_name, passwd=password, database= db_name)
+    cursor = my_db.cursor()
     # Execute all SQL commands and commit them into the DB
     for table in tables:
         cursor.execute(table)
     my_db.commit()
 
     # Close database connection
-    if my_db is not None and my_db.is_connected():
-          cursor.close() ; my_db.close()
+    cursor.close()
+    my_db.close()
 
 def main():
-    ''' AMIT - Should we create a parser also for this ..?'''
-    build_database(DB_NAME, 'localhost', 'root', 'Cabtbl-20', tables)
+    create_database('localhost', 'root', 'Cabtbl-20')
+    create_tables('localhost', 'root', 'Cabtbl-20', 'glassdoor_db', tables)
 
 
 if __name__ == "__main__":
