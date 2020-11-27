@@ -62,9 +62,20 @@ tables.append(job_post_location)
 
 
 # Building the database
+def create_database(host_name, user_name, password):
+    mydb = mysql.connector.connect(
+        host_name="localhost",
+        user_name="root",
+        password="Cabtbl-20"
+    )
+    mycursor = mydb.cursor()
+
+    mycursor.execute("CREATE DATABASE glassdoor")
+
 
 def build_database(db_name, host_name, user_name, password, tables):
     '''Define the connection and the cursor that is used for executing the SQL commands'''
+
     my_db = mysql.connector.connect(host=host_name, user=user_name, passwd=password, database=db_name)
     cursor = my_db.cursor()
 
