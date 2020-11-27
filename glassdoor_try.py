@@ -1,10 +1,10 @@
-
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from selenium.common.exceptions import WebDriverException, TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium import webdriver
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import argparse
@@ -38,7 +38,7 @@ def retry(func):
 
 class ScraperManager:
 
-    def __init__(self, path, job_title='', job_location='', rating_filter=None, number_of_jobs=None,
+    def __init__(self, path, driver_filename, job_title='', job_location='', rating_filter=None, number_of_jobs=None,
                  page_num=1):
 
         self.jobs_data = {'Company': [],
@@ -58,6 +58,7 @@ class ScraperManager:
         self._rating_filter = rating_filter
         self._base_url = 'https://www.glassdoor.com/Job/palo-alto-data-scientist-jobs-SRCH_IL.0,9_IC1147434_KO10,24.htm'
 
+        self._driver_path = driver_filename
         self.driver = self._init_driver()
         self._input_search_params()
         self._total_jobs_found = self._get_jobs_amount()
@@ -88,8 +89,13 @@ class ScraperManager:
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--incognito')
         # options.add_argument('--headless')
+        driver_path = Path.cwd().joinpath(self._driver_path)
+        try:
+            driver = webdriver.Chrome(executable_path=driver_path, options=options)
+        except WebDriverException:
+            raise IOError("Make sure you are using proper chrome driver\n"
+                          "and/or you've inserted its name properly (including the file suffix if needed)")
 
-        driver = webdriver.Chrome(executable_path='chromedriver', options=options)
         driver.get(self._base_url)
 
         self._bypass_login(driver)
@@ -299,42 +305,59 @@ class Job:
 
 def parse_args():
 
-    parser = argparse.ArgumentParser(prog='GlassDoorScraper.py',
-                                     usage="%(prog)s [-h] [-l] [-jt] [-n]",
+    desc = """ You are about to scrap the GlassDoor jobs search platform.
+    Before we begin, please make sure you have placed the Chrome driver within the same
+    directory of the this script file.
+    Chrome driver can be found at the following URL:
+    https://chromedriver.storage.googleapis.com/index.html?path=87.0.4280.20/ 
+    """
+
+    parser = argparse.ArgumentParser(description=desc,
+                                     prog='GlassDoorScraper.py',
+                                     usage="%(prog)s results_filepath driver_filename [-h] [-l] [-jt] [-n] [-v]",
                                      epilog="If you'll insert 'n' greater than amount of jobs found\n"
                                             "the scraper will simply scrap whatever it found, obviously")
 
-    parser.add_argument('-l', '--location', action='store', default=' ',
+    parser.add_argument('--location', action='store', default=' ',
                         help="Job Location")
 
-    parser.add_argument('-jt', '--job_type', action='store', default=' ',
+    parser.add_argument('--job_type', '-jt', action='store', default=' ',
                         help='Job Title')
 
-    parser.add_argument('-n', '--number_of_jobs', action='store', type=int,
-                        help="Amount of jobs to scrap")
+    parser.add_argument('--number_of_jobs', action='store', type=int,
+                        help="Amount of jobs to scrap, "
+                             "if you'll insert 'n' greater than amount of jobs found\n"
+                             "the scraper will simply scrap whatever it founds, obviously")
 
     parser.add_argument('-rt', '--rating_threshold', action='store', type=int,
                         help="Get jobs info above certain overall rating threshold")
 
-    parser.add_argument('-p', '--path', action='store', type=str, required=True,
+    parser.add_argument('res_path', action='store', type=str,
                         help="File path to save the results in")
 
-    parser.add_argument('-v', '--verbose', action='store_true',
+    parser.add_argument('driver_filename', action='store', type=str,
+                        help="File name of your Chrome Driver")
+
+    parser.add_argument('--verbose', action='store_true',
                         help="Optional - Choose either printing output to std or not")
 
-    #args = parser.parse_args()
-    args = parser.parse_args(['-jt', 'Data Analyst', '-n', '100', '-p', 'res.csv'])
-
+    # args = parser.parse_args()
+    # args = parser.parse_args(['-jt', 'Data Analyst', '-n', '100', '-p', 'res.csv'])
+    args = parser.parse_args(['-h'])
 
     return args
 
 
 def main():
-
     args = parse_args()
 
-    sm = ScraperManager(path=args.path, job_title=args.job_type, job_location=args.location,
-                        rating_filter=args.rating_threshold, number_of_jobs=args.number_of_jobs)
+    try:
+        sm = ScraperManager(path=args.res_path, driver_filename=args.driver_filename,
+                            job_title=args.job_type, job_location=args.location,
+                            rating_filter=args.rating_threshold, number_of_jobs=args.number_of_jobs)
+    except IOError as e:
+        print(e)
+        sys.exit(1)
 
     while sm.page_num <= sm.number_of_pages:
 
@@ -380,5 +403,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
