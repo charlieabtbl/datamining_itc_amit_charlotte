@@ -1,57 +1,52 @@
-import csv
+import mysql.connector
+import pandas as pd
+import numpy as np
 
-with open('res.csv', 'r') as f:
-    dict_reader = csv.DictReader(f)
-    # Initializing primary keys
-    idCompany = 0
-    idRatings = 0
-    idJob_post = 0
-    idJob_description = 0
-    idJob_post_location=0
-    idJob_location = 0
+# Preparing the dataframe
+data = pd.read_csv ('res.csv')
+df = pd.DataFrame(data, columns= ['Company','Location','Title','Salary','Company_Size','Revenue','Industry','Culture & Values','Diversity & Inclusion','Work/Life Balance','Senior Management','Comp & Benefits','Career Opportunities','Overall Rating'])
+df = df.replace({np.nan: None})
 
-    for j, row in notebook.tqdm(enumerate(dict_reader), total=X):
-        cur.execute('''INSERT INTO Job_description (idJob_description, description) 
-        VALUES (?, ?)''',
-        [idJob_description, row['Description']]) # But it seems like we're missing the description column
+for index, row in df.iterrows():
+    my_db = mysql.connector.connect(host='localhost', user='root', passwd='Cabtbl-20', database='glassdoor_db')
+    cursor = my_db.cursor()
+    cursor.execute('''INSERT INTO Ratings (Culture_values, Diversity_inclusion, Work_life_bal,  
+    Senior_mngt, Benefits, Career_opportunities, Overall_rating) VALUES(%s, %s, %s, %s, %s, %s, %s )''',
+                   [row['Culture & Values'], row['Diversity & Inclusion'], row['Work/Life Balance'],
+                    row['Senior Management'], row['Comp & Benefits'],row['Career Opportunities'],row['Overall '
+                                                                                                     'Rating']])
+    idRatings = cursor.lastrowid
+    cursor.execute('''INSERT INTO Company (Company_name, Size_est, Revenue_est, Industry, idRatings) 
+    VALUES (%s, %s, %s, %s, %s)''',
+    [row['Company'], row['Company_Size'], row['Revenue'], row['Industry'], idRatings])
 
-        cur.execute('''INSERT INTO Ratings (idRatings, 
-                            Culture_values,
-                            Diversity_inclusion,
-                            Work_life_bal,
-                            Senior_mngt,
-                            Benefits,
-                            Career_opportunities,
-                            Overall_rating) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                    [idRatings, row['Culture & Values'], row['Diversity & Inclusion'], row['Work/Life Balance'], row['Senior Management'],
-                     row['Comp & Benefits'],row['Career Opportunities'],row['Overall Rating']])
+    idCompany = cursor.lastrowid
 
-        cur.execute('''INSERT INTO Company (Company_name, Size_est, Revenue_est, Industry, idRatings) 
-        VALUES (?, ?, ?, ?, ?)''',
-        [idCompany, row['Company'], row['Company_Size'], row['Revenue'], row['Industry'], idRatings])
+    cursor.execute('''INSERT INTO Job_post (Title, Salary_range, idCompany)
+                    VALUES (%s, %s, %s)''',
+    [row['Title'], row['Salary'], idCompany])
 
-        cur.execute('''INSERT INTO Job_post (idJob_post, Title, Salary_range, idJob_description, idCompany)
-                        VALUES (?, ?, ?, ?, ?)''',
-        [idJob_post, row['Title'], row['Salary'], idJob_description, idCompany])
+    idJob_post = cursor.lastrowid
 
-        cur.execute('''INSERT INTO Job_location (idJob_location int, City, State) 
-        VALUES (?, ?, ?)''',
-        [idJob_location, row[''], row['']])
+    try:
+        cursor.execute('''INSERT INTO Job_location (City, State) 
+        VALUES (%s, %s)''',
+        [(row['Location'].split(','))[0], (row['Location'].split(','))[1]])
+    except IndexError:
+        cursor.execute('''INSERT INTO Job_location (City, State) 
+        VALUES (%s, %s)''',
+        [(row['Location'].split(','))[0], 'NA'])
 
-        cur.execute('''INSERT INTO Job_post_location (idJob_post_location int, idJob_post, idJob_location) 
-        VALUES (?, ?, ?)''',
-        [idJob_post_location, idJob_post, idJob_location])
+    idJob_location = cursor.lastrowid
+
+    cursor.execute('''INSERT INTO Job_post_location (idJob_post, idJob_location) 
+    VALUES (%s, %s)''',
+    [idJob_post, idJob_location])
 
 
-
-        idCompany+=1
-        idRatings += 1
-        idJob_description+=1
-        idJob_post+=1
-        idJob_post_location +=1
-        idJob_location+=1
-
+    my_db.commit()
+    my_db.close()
+    cursor.close()
 
 
 
