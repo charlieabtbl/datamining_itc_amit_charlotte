@@ -23,27 +23,6 @@ idJob_location) REFERENCES Job_location(idJob_location))'''
 tables.append(job_post_location)
 
 
-# Building the database
-
-def create_database(host_name, user_name, password):
-    '''Take host_name, user_name and password as parameters to connect to mysql and returns a database with tables
-    if it doesn't already exists '''
-
-    # Connecting to the database
-    my_db = mysql.connector.connect(host=host_name, user=user_name, passwd=password)
-    cursor = my_db.cursor()
-
-    # Making sure the database 'glassdoor' doesn't exist
-    cursor.execute("SHOW DATABASES")
-    databases = cursor.fetchall()
-    if ('glassdoor_db',) not in databases:
-        cursor.execute("CREATE DATABASE glassdoor_db")
-        print('glassdoor_db was created')
-    else:
-        print('glassdoor_db already exists')
-    cursor.close()
-    my_db.close()
-
 
 def create_tables(host_name, user_name, password, tables):
     # Connecting to the database
