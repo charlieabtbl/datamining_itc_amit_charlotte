@@ -24,10 +24,12 @@ The next step was to generalize the search so that the user could choose his own
       - we imported all the necessary modules : requests, bs4, os, time, re, numpy
       - we defined three classes
         the Scrapper Manager : allows us to download the page contents, get the elements, and save them in a pandas dataframe
+        
         the Job class : allows us to specifically extract the features and the urls of each job position. The features that we chose for now are the following : company name, title, location, number of stars (company's grade), and the salary estimation.
+        
         the DataBaseManager : allows us to create the database and insert the scraped data in it. 
-      - we defined the command line argument  
-      we defined the main function, which scraps the job offers for Data Scientists in Palo Alto using two class objects scrap and job_object
+        
+      - we defined the command line argument 
  
 (2) res.csv
     This file is the output from our scraping after running DataScraper.py. It's a csv file. 
