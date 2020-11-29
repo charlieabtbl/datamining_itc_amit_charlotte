@@ -437,6 +437,7 @@ class Job:
         Scraps for the ratings fields and their scores anc calculates the overall rating.
         Eventually, stores all the information in ratings_dict
         """
+        logging.info("Scraping for Ratings scores")
 
         raw_rating_parameters = self._driver.find_elements_by_xpath(
             './/div[@class="stars"]/ul/li/span[@class="ratingType"]')
@@ -453,6 +454,9 @@ class Job:
             overall_rating = float(round(sum(self.ratings.values()) / len(self.ratings), 2))
 
             self.ratings['Overall Rating'] = overall_rating
+
+        logging.info(f"Done scraping for ratings\n"
+                     f"The Ratings scores are: {self.ratings}")
 
 
 def parse_args():
@@ -499,7 +503,7 @@ def parse_args():
 
     args = parser.parse_args()
     # args = parser.parse_args(['res.csv', 'chromedriver.exe', '-l', 'San Francisco', '-jt', 'data scientist',
-    #                           '-n', '10'])
+    #                           '-n', '10', '--verbose'])
     # args = parser.parse_args(['-h'])
 
     return args
@@ -542,11 +546,25 @@ def main():
             if job_id >= sm.num_of_jobs:
                 break
 
-            job_obj.get_common_params()
+            try:
+                job_obj.get_common_params()
+            except Exception as e:
+                print(f"Failed due to {e}")
+                sm.driver.close()
+                sys.exit(1)
 
-            if job_obj.overall_rating >= args.rating_threshold:
+            if (job_obj.overall_rating >= args.rating_threshold) or \
+               (np.isnan(job_obj.overall_rating) and args.rating_threshold == 0):
 
                 logging.info(f"Scraping job number {job_id+1} out of {sm.num_of_jobs}")
+
+                if args.verbose:
+                    print(f"@@ Scrap job number {job_id+1} out of {sm.num_of_jobs}: {(job_id+1)/sm.num_of_jobs:.2%} @@")
+                    print(f"\tCompany Name: {job_obj.company_name}\n"
+                          f"\tJob title: {job_obj.job_title}\n"
+                          f"\tCity: {job_obj.job_city}\n"
+                          f"\tState: {job_obj.job_state}\n"
+                          f"\tSalary: {job_obj.job_min_salary}-{job_obj.job_max_salary}")
 
                 try:
                     sm.click_tab('company')
@@ -554,6 +572,10 @@ def main():
                     pass
                 finally:
                     job_obj.get_non_common_params()
+
+                if args.verbose:
+                    print(f"\tCompany Size: {job_obj.min_company_size} to {job_obj.max_company_size}")
+                    print(f"\tIndustry: {job_obj.company_industry}\n")
 
                 sm.fill_dict(job_obj)
 
