@@ -19,10 +19,13 @@ The next step was to generalize the search so that the user could choose his own
 
 
 ## Structure of the project
-(1) GlassdoorScraper.py: 
-    In this file : 
-      - we imported all the necessary modules : requests, bs4, os, time, re, numpy
-      - we defined the command line argument to enter the search parameters and the database identification parameters.
+(1) GlassdoorScraper.py: <br>
+      - we imported all the necessary modules :<br> 
+      * Selenium - for interacting with the web page<br>
+      * numpy (for storing nans)<br>
+      * pandas - for storing the scraping results temporary in a DataFrame<br>
+      * mysql.connector<br>
+      - we defined the command line argument to enter the search parameters and the database identification parameters.<br>
       - we defined three classes
       
         the Scrapper Manager : allows us to download the page contents, get the elements, and save them in a pandas dataframe
@@ -37,6 +40,9 @@ The next step was to generalize the search so that the user could choose his own
 (3) requirements.txt
 This file informs on all the installations required to allow the code to run.
 
+(4) config.json
+Holds information regarding the operating system, the chromdriver path, the final results file path and the database host
+
 
 ## How to perform the scrape and create the database 
 
@@ -44,27 +50,27 @@ This file informs on all the installations required to allow the code to run.
 
 (1) Clone the git repository on your local system
 
-(2) Open GlassdoorScraper.py and run with -h parameter to get help
-
-(3) Download Chrome driver : https://chromedriver.storage.googleapis.com/index.html?path=87.0.4280.20/
+(2) Download Chrome driver : https://chromedriver.storage.googleapis.com/index.html?path=87.0.4280.20/
 and make sure to place it within the same directory of the script file.
 
-(4) Run the script Glassdoor Scraper with 4 required arguments : 
+(3) Modify the parameters inside the config.json file in accordance to your setup
 
-2 positional:
-- res_path = the file path to save the results in
-- driver_filename = file name of your chrome driver
+(4) Open GlassdoorScraper.py and run with -h parameter to get help
 
-2 optional required : 
-- --db-username root : use your database user name
-- --db-password DB_PASSWORD : use your database login password
+(5) Run the script Glassdoor Scraper with two required arguments : 
 
-(5) Personalize your search ! Let's say you want Data Scientists Jobs in Palo Alto and create a database 'Glassdoor_db'
+- --db-username: use your database user name
+- --db-password: use your database login password
+
+- The rest of the required arguments are taken directly from the config.json file 
+
+(6) Personalize your search ! Let's say you want Data Scientists Jobs in Palo Alto and create a database 'Glassdoor_db'
 Add optional arguments :
 - -l "Palo Alto"
 - -jt "Data Scientist"
 - -rt 4
 - -v : if you want to see the progress on screen
+- -hl: 
 - --db-name "Glassdoor_db" : choose database name as you wish 
 
 
