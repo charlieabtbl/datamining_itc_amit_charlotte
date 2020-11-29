@@ -48,7 +48,7 @@ def retry(func):
             try_number += 1
         else:
             logging.error(f"Was trying to execute {func.__name__} {try_number} times but FAILED")
-            raise NoSuchElementException("Apparently no such element on page")
+            raise ValueError("Apparently no such element on page or something is missing")
 
     return func_wrapper
 
@@ -358,8 +358,8 @@ class Job:
         Interact with the website for clicking on this specific job button
         Used in main()
         """
-        self._job_tag.click()
-        # self._job_tag.find_element_by_class_name("jobInfoItem").click()
+        # self._job_tag.click()
+        self._job_tag.find_element_by_class_name("jobInfoItem").click()
 
     @retry
     def get_common_params(self):
@@ -803,7 +803,7 @@ def main():
 
                 try:
                     sm.click_tab('company')
-                except NoSuchElementException:
+                except ValueError:
                     pass
                 finally:
                     job_obj.get_non_common_params()
@@ -817,7 +817,7 @@ def main():
                 logging.info("Generating the Ratings dict")
                 try:
                     sm.click_tab('rating')
-                except NoSuchElementException:
+                except ValueError:
                     sm.update_nans()
                 else:
                     job_obj.get_ratings_scores()
