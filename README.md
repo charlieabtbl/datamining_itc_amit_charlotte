@@ -78,4 +78,5 @@ ONLY USE DOUBLE QUOTES
 
 ## The database GlassdoorDB
 
+![Screenshot](GlassdoorDB.png)
 
