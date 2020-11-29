@@ -87,9 +87,13 @@ class ScraperManager:
         self._driver_path = driver_filename
         self.driver = self._init_driver()
         self._input_search_params()
+        time.sleep(random.uniform(0.8, 2.5))
         self._total_jobs_found = self._get_amount(of_what='jobs')
         self._total_pages = self._get_amount(of_what='pages')
-        self._num_of_jobs = number_of_jobs if number_of_jobs < self._total_jobs_found else self._total_jobs_found
+        if number_of_jobs is not None:
+            self._num_of_jobs = min(number_of_jobs, self._total_jobs_found)
+        else:
+            self._num_of_jobs = self._total_jobs_found
 
         logging.info(f"Successfully constructed ScraperManager instance\n"
                      f"Search total pages: {self._total_pages},\n"
