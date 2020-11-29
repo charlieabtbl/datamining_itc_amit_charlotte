@@ -12,6 +12,7 @@ import numpy as np
 import argparse
 import logging
 import random
+import json
 import time
 import csv
 import sys
@@ -20,6 +21,8 @@ import re
 logging.basicConfig(filename="glassdoor_scraping.log",
                     format='%(asctime)s-%(levelname)s-FUNC:%(funcName)s-LINE:%(lineno)d-%(message)s',
                     level=logging.INFO)
+
+BASE_URL = "https://www.glassdoor.com/Job/palo-alto-data-scientist-jobs-SRCH_IL.0,9_IC1147434_KO10,24.htm"
 
 
 def retry(func):
@@ -30,7 +33,7 @@ def retry(func):
 
     def func_wrapper(*args, **kwargs):
         try_number = 1
-        while try_number <= 5:
+        while try_number <= 3:
             logging.info(f"Executing {func.__name__}, try number: {try_number}")
             try:
                 return func(*args, **kwargs)
@@ -52,7 +55,7 @@ def retry(func):
 
 class ScraperManager:
 
-    def __init__(self, path, driver_filename, job_title, job_location, rating_filter, number_of_jobs):
+    def __init__(self, path, driver_filename, job_title, job_location, rating_filter, number_of_jobs, headless):
         """
         Construct ScraperManager instance with user CLI arguments
         """
@@ -82,7 +85,7 @@ class ScraperManager:
         self._location = job_location
         self._res_path = path
         self.rating_filter = rating_filter
-        self._base_url = 'https://www.glassdoor.com/Job/palo-alto-data-scientist-jobs-SRCH_IL.0,9_IC1147434_KO10,24.htm'
+        self._headless = headless
 
         self._driver_path = driver_filename
         self.driver = self._init_driver()
@@ -125,7 +128,8 @@ class ScraperManager:
         options = webdriver.ChromeOptions()
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--incognito')
-        # options.add_argument('--headless')
+        if self._headless:
+            options.add_argument('--headless')
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         driver_path = Path.cwd().joinpath(self._driver_path)
         try:
@@ -134,7 +138,7 @@ class ScraperManager:
             raise IOError("Make sure you are using proper chrome driver\n"
                           "and/or you've inserted its name properly (including the file suffix if needed)")
 
-        driver.get(self._base_url)
+        driver.get(BASE_URL)
 
         logging.info("Successfully created Chromedriver instance")
 
@@ -672,30 +676,28 @@ def parse_args():
 
     desc = """ You are about to scrap the GlassDoor jobs search platform.
     Before we begin, please make sure you have placed the Chrome driver within the same
-    directory of the this script file.
+    directory of the this script file and that you've updated the config.json file accordingly.
     Chrome driver can be found at the following URL:
     https://chromedriver.storage.googleapis.com/index.html?path=87.0.4280.20/ 
     """
 
+    usage = """%(prog)s [-h] [-l] [-jt] [-n] [--db-username/-dbu] [--db-password/-dbp] [--db-name/-dbn] [
+    --headless/-hl] [--verbose/-v] """
+
     parser = argparse.ArgumentParser(description=desc,
                                      prog='GlassdoorScraper.py',
-                                     usage="%(prog)s results_filepath driver_filename [-h] [-l] [-jt] [-n] [-v]",
-                                     epilog="Make sure to have the chromdriver at the exact same "
-                                            "directory of this script!")
+                                     usage=usage,
+                                     epilog="Make sure to have the chromedriver at the exact same "
+                                            "directory of this script!",
+                                     fromfile_prefix_chars='@')
 
-    parser.add_argument('res_path', action='store', type=str,
-                        help="File path to save the results in")
-
-    parser.add_argument('driver_filename', action='store', type=str,
-                        help="File name of your Chrome Driver")
-
-    parser.add_argument('--location', '-l', action='store', default=' ', type=str,
+    parser.add_argument('-l', '--location', action='store', default=' ', type=str,
                         help="Job Location")
 
-    parser.add_argument('--job_type', '-jt', action='store', default=' ', type=str,
+    parser.add_argument('-jt', '--job_type', action='store', default=' ', type=str,
                         help='Job Title')
 
-    parser.add_argument('--number_of_jobs', '-n', action='store', type=int, default=None,
+    parser.add_argument('-n', '--number_of_jobs' , action='store', type=int, default=None,
                         help="Amount of jobs to scrap, "
                              "if you'll insert 'n' greater than amount of jobs found\n"
                              "the scraper will simply scrap whatever it founds, obviously")
@@ -703,16 +705,22 @@ def parse_args():
     parser.add_argument('-rt', '--rating_threshold', action='store', type=float, default=0,
                         help="Get jobs info above certain overall rating threshold")
 
-    parser.add_argument('--db-username', action='store', type=str, required=True,
-                        help="Your database user name")
+    parser.add_argument('-dbu', '--db-username', action='store', type=str, required=True,
+                        help="Your database user name",
+                        metavar="DB_USERNAME")
 
-    parser.add_argument('--db-password', action='store', required=True, type=str,
-                        help="Your database login password")
+    parser.add_argument('-dbp', '--db-password', action='store', required=True, type=str,
+                        help="Your database login password",
+                        metavar="DB_PASSWORD")
 
-    parser.add_argument('--db-name', action='store', type=str, default="GlassdoorDB",
-                        help="Choose database name as you wish (optional)")
+    parser.add_argument('-dbn', '--db-name', action='store', type=str, default="GlassdoorDB",
+                        help="Choose database name as you wish (optional)",
+                        metavar="DB_NAME")
 
-    parser.add_argument('--verbose', action='store_true',
+    parser.add_argument("-hl", "--headless", action='store_true',
+                        help="Choose whether or not displaying the google chrome window while scraping")
+
+    parser.add_argument('-v', '--verbose', action='store_true',
                         help="Optional - Choose either printing output to std or not")
 
     args = parser.parse_args()
@@ -737,10 +745,17 @@ def main():
     """
     args = parse_args()
 
+    with open('config.json') as config_file:
+        configurations = json.load(config_file)
+
+    chromedriver_path = configurations['chromedriver']
+    results_path = configurations['results_path']
+
     try:
-        sm = ScraperManager(path=args.res_path, driver_filename=args.driver_filename,
+        sm = ScraperManager(path=results_path, driver_filename=chromedriver_path,
                             job_title=args.job_type, job_location=args.location,
-                            rating_filter=args.rating_threshold, number_of_jobs=args.number_of_jobs)
+                            rating_filter=args.rating_threshold, number_of_jobs=args.number_of_jobs,
+                            headless=args.headless)
     except IOError as e:
         logging.error(f"Failed due to: {e}")
         sys.exit(1)
@@ -817,24 +832,23 @@ def main():
     sm.save_results()
     logging.info("Done Scraping!")
 
-
     #### Creating the Database ###
 
     createTables_commands = DatabaseManager.construct_create_table_commands()
 
+    db_host = configurations['database_host']
     db_username = args.db_username
     db_password = args.db_password
     db_name = args.db_name
     jobs = sm.num_of_jobs
-    file_path = args.res_path
 
-    DatabaseManager.create_database('localhost', username=db_username, password=db_password, db_name=db_name)
+    DatabaseManager.create_database(db_host, username=db_username, password=db_password, db_name=db_name)
 
-    DatabaseManager.create_tables('localhost', username=db_username, password=db_password, db_name=db_name,
+    DatabaseManager.create_tables(db_host, username=db_username, password=db_password, db_name=db_name,
                                   create_table_commands=createTables_commands)
 
-    DatabaseManager.insert_values('localhost', username=db_username, password=db_password, db_name=db_name,
-                                  data_file=file_path, num_of_jobs=jobs)
+    DatabaseManager.insert_values(db_host, username=db_username, password=db_password, db_name=db_name,
+                                  data_file=results_path, num_of_jobs=jobs)
 
 
 if __name__ == "__main__":
