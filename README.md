@@ -70,7 +70,7 @@ Add optional arguments :
 - -jt "Data Scientist"
 - -rt 4
 - -v : if you want to see the progress on screen
-- -hl: 
+- -hl: Choose whether or not you'd like to display the chrome window
 - --db-name "Glassdoor_db" : choose database name as you wish 
 
 
