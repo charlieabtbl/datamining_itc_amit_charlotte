@@ -9,8 +9,8 @@ Founded in 2007 in California, Glassdoor is a website where current and former e
 Glassdoor also allows users to anonymously submit and view salaries as well as search and apply for jobs on its platform.
 
 ## Objective
-Our objective is to be able to get a csv file describing the current job offers from different companies, according to selected filters (location and type of position). 
-This type of file could be very useful in a job search. 
+Our objective is to be able to get a database describing the current job offers from different companies, according to selected filters (location and type of position) according to the user search.
+This type of database could be very useful in a job search. 
 
 ## Our method
 To do so, we started by scraping the pages with a specific filter : the job position 'Data Scientist' in the location 'Palo Alto'.
@@ -22,28 +22,25 @@ The next step was to generalize the search so that the user could choose his own
 (1) GlassdoorScraper.py: 
     In this file : 
       - we imported all the necessary modules : requests, bs4, os, time, re, numpy
+      - we defined the command line argument to enter the search parameters and the database identification parameters.
       - we defined three classes
+      
         the Scrapper Manager : allows us to download the page contents, get the elements, and save them in a pandas dataframe
         
-        the Job class : allows us to specifically extract the features and the urls of each job position. The features that we chose for now are the following : company name, title, location, number of stars (company's grade), and the salary estimation.
+        the Job class : allows us to specifically extract the features and the urls of each job position. T
         
-        the DataBaseManager : allows us to create the database and insert the scraped data in it. 
-        
-      - we defined the command line argument 
- 
-(2) res.csv
-    This file is the output from our scraping after running DataScraper.py. It's a csv file. 
-    
-(3) glassdoor_robots.txt
+        the DataBaseManager : allows us to create the database and insert the scraped data in it. The database name by default is 'GlassdoorDB'
+     
+(2) glassdoor_robots.txt
     This file is the robots.txt file from Glassdoor that informs others on what they are allowed to scrap or not on the website. 
 
-(4) requirements.txt
+(3) requirements.txt
 This file informs on all the installations required to allow the code to run.
 
-(5) db_design_mysql.py
-This file contains the code for the sql database creation : creation of the database 'glassdoor_db' and creation of the tables.
 
 ## How to perform the scrape and create the database 
+
+(0) Make sure you have installed mysql.connector and that you have your username and password for identification.
 
 (1) Clone the git repository on your local system
 
