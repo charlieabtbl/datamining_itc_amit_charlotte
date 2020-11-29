@@ -6,12 +6,14 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium import webdriver
 from pathlib import Path
+import mysql.connector
 import pandas as pd
 import numpy as np
 import argparse
 import logging
 import random
 import time
+import csv
 import sys
 import re
 
@@ -25,6 +27,7 @@ def retry(func):
     Wrap any function that has to interact with the web-site.
     Handles  selenium's StaleElementExceptions and NoSuchElementException
     """
+
     def func_wrapper(*args, **kwargs):
         try_number = 1
         while try_number <= 5:
@@ -190,7 +193,7 @@ class ScraperManager:
             pattern = r"(\d+$)"
             xpath = './/div[@data-test="page-x-of-y"]'
 
-        wait = WebDriverWait(self.driver, 5)
+        wait = WebDriverWait(self.driver, 2)
         raw_number = wait.until(EC.presence_of_element_located(
             (By.XPATH, xpath))).text
 
@@ -231,7 +234,7 @@ class ScraperManager:
         else:
             raise ValueError("tab_name should be among [company, rating, next]")
 
-        wait = WebDriverWait(self.driver, 3)
+        wait = WebDriverWait(self.driver, 2)
         wait.until(EC.presence_of_element_located(
             (By.XPATH, xpath))).click()
 
@@ -384,7 +387,7 @@ class Job:
 
         try:
             job_salary_estim = self._job_tag.find_element_by_class_name('salaryEstimate').text
-            salary_range = re.findall(r"(\d+K)-\$(\d+K)", str(job_salary_estim))
+            salary_range = re.findall(r"\$(\d+\w*)\S+\$(\d+\w*)", str(job_salary_estim))
             self.job_min_salary = salary_range[0][0]
             self.job_max_salary = salary_range[0][1]
         except NoSuchElementException:
@@ -400,7 +403,7 @@ class Job:
         logging.info("Extracting more Job's features")
         try:
             company_size = self._driver.find_element_by_xpath(
-                            './/div[@class="infoEntity"]/label[text()="Size"]/following-sibling::*').text
+                './/div[@class="infoEntity"]/label[text()="Size"]/following-sibling::*').text
 
             pattern = r"(\d+)"
             size_range = re.findall(pattern, str(company_size))
@@ -459,6 +462,204 @@ class Job:
                      f"The Ratings scores are: {self.ratings}")
 
 
+class DatabaseManager:
+
+    @staticmethod
+    def construct_create_table_commands():
+        """
+        Construct mySQL commands for creating the tables in the database
+        """
+        logging.info("Constructing mySQL commands for creating tables")
+        crate_table_commands = {}
+
+        job_ratings = '''CREATE TABLE Ratings(idRatings INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                                              Culture_values FLOAT, 
+                                              Diversity_inclusion FLOAT,
+                                              Work_life_balance FLOAT,
+                                              Senior_management FLOAT, 
+                                              Benefits FLOAT,
+                                              Career_opportunities FLOAT, 
+                                              Overall_rating FLOAT)'''
+
+        crate_table_commands["Ratings"] = job_ratings
+
+        company = '''
+        CREATE TABLE Company(idCompany INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+                             Company_name VARCHAR(45) NOT NULL, 
+                             Min_Size INT,
+                             Max_Size INT, 
+                             Revenue_est TEXT, 
+                             Industry VARCHAR(50), 
+                             idRatings INT, 
+                             FOREIGN KEY(idRatings) REFERENCES Ratings(idRatings))'''
+
+        crate_table_commands["Company"] = company
+
+        job_post = '''
+        CREATE TABLE Job_post(idJob_post INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+                              Title TEXT NOT NULL, 
+                              Min_Salary VARCHAR(10),
+                              Max_Salary VARCHAR(10), 
+                              idCompany INT, 
+                              FOREIGN KEY (idCompany) REFERENCES Company(idCompany))'''
+
+        crate_table_commands["Job_post"] = job_post
+
+        job_location = '''
+        CREATE TABLE Job_location(idJob_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+                                  City VARCHAR(45), 
+                                  State VARCHAR(10))'''
+
+        crate_table_commands["Job_location"] = job_location
+
+        job_post_location = '''
+        CREATE TABLE Job_post_location(idJob_post_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY,  
+                                       idJob_post INT,
+                                       idJob_location INT,
+                                       FOREIGN KEY (idJob_post) REFERENCES Job_post(idJob_post),
+                                       FOREIGN KEY (idJob_location) REFERENCES Job_location(idJob_location))'''
+
+        crate_table_commands["Job_post_location"] = job_post_location
+
+        logging.info("Done constructing tables commands")
+
+        return crate_table_commands
+
+    @staticmethod
+    def create_database(host, username, password, db_name):
+        """
+        Create new mySQL database (if not exists yet)
+        """
+        logging.info("Establishing mySQL connection")
+        my_db = mysql.connector.connect(host=host, user=username, passwd=password)
+        cursor = my_db.cursor()
+        logging.info("Connection established successfully")
+
+        cursor.execute("SHOW DATABASES")
+        databases = cursor.fetchall()
+        if (db_name.lower(),) not in databases:
+            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+            my_db.commit()
+            cursor.execute("SHOW DATABASES")
+            databases = cursor.fetchall()
+            if (db_name.lower(),) in databases:
+                logging.info(f"Successfully created {db_name} Database")
+            else:
+                logging.error("Could not create Database")
+
+            cursor.close()
+            my_db.close()
+            logging.info("mySQL connection closed")
+
+    @staticmethod
+    def create_tables(host, username, password, db_name, create_table_commands):
+        """
+        Based on the returned value from construct_create_table_commands() function,
+        execute mySQL commands for creating the tables inside the db_name database
+        :param create_table_commands - Dict with table names as keys, and mySQL 'create table'
+                                       command as values
+        """
+        logging.info("Establishing mySQL connection")
+        my_db = mysql.connector.connect(host=host, user=username, passwd=password, database=db_name)
+        cursor = my_db.cursor()
+        logging.info("Connection established successfully")
+
+        cursor.execute(f"SHOW TABLES IN {db_name}")
+        existing_tables = cursor.fetchall()
+        for table_name, crate_command in create_table_commands.items():
+            if (table_name.lower(),) not in existing_tables:
+                cursor.execute(crate_command)
+                logging.info(f"Creating {table_name} table")
+                my_db.commit()
+                logging.info(f"{table_name} created successfully")
+
+        cursor.close()
+        my_db.close()
+        logging.info("mySQL connection closed")
+
+    @staticmethod
+    def insert_values(host, username, password, db_name, data_file, num_of_jobs):
+        """
+        Reads data from a given data_file and inserts its values to the tables in db_name
+        """
+        logging.info("Establishing mySQL connection")
+        my_db = mysql.connector.connect(host=host, user=username, passwd=password, database=db_name)
+        cursor = my_db.cursor()
+        logging.info("Connection established successfully")
+
+        # Extracting relevant data from the csv file
+        with open(fr"{data_file}", 'r') as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+
+            for line_num, line in enumerate(reader):
+                line = DatabaseManager.replace_nans(line)
+                ratings_data = line[11:]
+
+                cursor.execute('''INSERT INTO Ratings (Culture_values, 
+                                                       Diversity_inclusion,
+                                                       Work_life_balance,  
+                                                       Senior_management,
+                                                       Benefits,
+                                                       Career_opportunities,
+                                                       Overall_rating)
+                                 VALUES (%s, %s, %s, %s, %s, %s, %s )''', ratings_data)
+
+                idRatings = cursor.lastrowid
+
+                cursor.execute('''INSERT INTO Company (Company_name,
+                                                       Min_Size, 
+                                                       Max_Size, 
+                                                       Revenue_est, 
+                                                       Industry, 
+                                                       idRatings) 
+                                  VALUES (%s, %s, %s, %s, %s, %s)''',
+                               (line[1], line[7], line[8], line[9], line[10], idRatings))
+
+                idCompany = cursor.lastrowid
+
+                cursor.execute('''INSERT INTO Job_post (Title, 
+                                                        Min_Salary, 
+                                                        Max_Salary, 
+                                                        idCompany)
+                                  VALUES (%s, %s, %s, %s)''', (line[4], line[5], line[6], idCompany))
+
+                idJob_post = cursor.lastrowid
+
+                cursor.execute('''INSERT INTO Job_location (City, State) 
+                                  VALUES (%s, %s)''', (line[2], line[3]))
+
+                idJob_location = cursor.lastrowid
+
+                cursor.execute('''INSERT INTO Job_post_location (idJob_post, idJob_location) 
+                                  VALUES (%s, %s)''', (idJob_post, idJob_location))
+
+                if num_of_jobs <= 10:
+                    logging.info("Committing changes")
+                    my_db.commit()
+                    logging.info("Done committing changes")
+                elif num_of_jobs % 15 == 0:
+                    logging.info("Committing changes")
+                    my_db.commit()
+                    logging.info("Done committing changes")
+
+        my_db.commit()
+        cursor.close()
+        my_db.close()
+        logging.info("Connection established successfully")
+
+    @staticmethod
+    def replace_nans(val_list):
+        """
+        Replace missing values with nans.
+        Making it easier for the mySQL to handle with.
+        An auxiliary function to insert_values()
+        """
+        fixed_list = [item if item != '' else None for item in val_list]
+
+        return fixed_list
+
+
 def parse_args():
     """
     Parse CLI user arguments.
@@ -490,7 +691,7 @@ def parse_args():
     parser.add_argument('--job_type', '-jt', action='store', default=' ', type=str,
                         help='Job Title')
 
-    parser.add_argument('--number_of_jobs', '-n',  action='store', type=int, default=None,
+    parser.add_argument('--number_of_jobs', '-n', action='store', type=int, default=None,
                         help="Amount of jobs to scrap, "
                              "if you'll insert 'n' greater than amount of jobs found\n"
                              "the scraper will simply scrap whatever it founds, obviously")
@@ -498,13 +699,27 @@ def parse_args():
     parser.add_argument('-rt', '--rating_threshold', action='store', type=float, default=0,
                         help="Get jobs info above certain overall rating threshold")
 
+    parser.add_argument('--db-username', action='store', type=str, required=True,
+                        help="Your database user name")
+
+    parser.add_argument('--db-password', action='store', required=True, type=str,
+                        help="Your database login password")
+
+    parser.add_argument('--db-name', action='store', type=str, default="GlassdoorDB",
+                        help="Choose database name as you wish (optional)")
+
     parser.add_argument('--verbose', action='store_true',
                         help="Optional - Choose either printing output to std or not")
 
     args = parser.parse_args()
+
     # args = parser.parse_args(['res.csv', 'chromedriver.exe', '-l', 'San Francisco', '-jt', 'data scientist',
-    #                           '-n', '10', '--verbose'])
-    # args = parser.parse_args(['-h'])
+    #                           '-n', '10', '--verbose', '--db-username', 'root', '--db-password', 'Ihaawsmon6am',
+    #                           '--db-name', "GlassdoorDB"])
+
+    # args = parser.parse_args(['res.csv', 'chromedriver.exe', '-l', 'San Francisco', '-n', '50',
+    #                           '--db-username', 'root', '--db-password', 'Ihaawsmon6am',
+    #                           '--db-name', "GlassdoorDB"])
 
     return args
 
@@ -554,12 +769,13 @@ def main():
                 sys.exit(1)
 
             if (job_obj.overall_rating >= args.rating_threshold) or \
-               (np.isnan(job_obj.overall_rating) and args.rating_threshold == 0):
+                    (np.isnan(job_obj.overall_rating) and args.rating_threshold == 0):
 
-                logging.info(f"Scraping job number {job_id+1} out of {sm.num_of_jobs}")
+                logging.info(f"Scraping job number {job_id + 1} out of {sm.num_of_jobs}")
 
                 if args.verbose:
-                    print(f"@@ Scrap job number {job_id+1} out of {sm.num_of_jobs}: {(job_id+1)/sm.num_of_jobs:.2%} @@")
+                    print(
+                        f"@@ Scrap job number {job_id + 1} out of {sm.num_of_jobs}: {(job_id + 1) / sm.num_of_jobs:.2%} @@")
                     print(f"\tCompany Name: {job_obj.company_name}\n"
                           f"\tJob title: {job_obj.job_title}\n"
                           f"\tCity: {job_obj.job_city}\n"
@@ -598,5 +814,26 @@ def main():
     logging.info("Done Scraping!")
 
 
+    #### Creating the Database ###
+
+    createTables_commands = DatabaseManager.construct_create_table_commands()
+
+    db_username = args.db_username
+    db_password = args.db_password
+    db_name = args.db_name
+    jobs = sm.num_of_jobs
+    file_path = args.res_path
+
+    DatabaseManager.create_database('localhost', username=db_username, password=db_password, db_name=db_name)
+
+    DatabaseManager.create_tables('localhost', username=db_username, password=db_password, db_name=db_name,
+                                  create_table_commands=createTables_commands)
+
+    DatabaseManager.insert_values('localhost', username=db_username, password=db_password, db_name=db_name,
+                                  data_file=file_path, num_of_jobs=jobs)
+
+
 if __name__ == "__main__":
     main()
+
+
