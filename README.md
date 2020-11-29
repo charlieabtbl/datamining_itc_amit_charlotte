@@ -41,16 +41,21 @@ This file informs on all the installations required to allow the code to run.
 (5) db_design_mysql.py
 This file contains the code for the sql database creation : creation of the database 'glassdoor_db' and creation of the tables.
 
-## How to perform the scrape 
+## How to perform the scrape and create the database 
 
 (1) Clone the git repository on your local system
+
 (2) Open GlassdoorScraper.py and run with -h parameter to get help
+
 (3) Download Chrome driver : https://chromedriver.storage.googleapis.com/index.html?path=87.0.4280.20/
 and make sure to place it within the same directory of the script file.
+
 (4) Run the script Glassdoor Scraper with 4 required arguments : 
+
 2 positional:
 - res_path = the file path to save the results in
 - driver_filename = file name of your chrome driver
+
 2 optional required : 
 - --db-username root : use your database user name
 - --db-password DB_PASSWORD : use your database login password
@@ -66,7 +71,11 @@ Add optional arguments :
 
 WARNING : DO NOT USE SINGLE QUOTES WHEN ENTERING ARGUMENTS.
 ONLY USE DOUBLE QUOTES
-Now press enter : a csv file file should be saved as res_path as the output. 
+
+(6) Now press enter 
+
+(7) OUTPUT : a csv file should be saved as res_path as the output and you can access the database model under the name you chose or GlassdoorDB (default name) in Workbench or by connecting to mySql in the terminal.
+
+## The database GlassdoorDB
 
 
-Process finished with exit code 0
