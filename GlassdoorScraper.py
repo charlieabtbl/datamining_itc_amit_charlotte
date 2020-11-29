@@ -372,7 +372,7 @@ class Job:
         self.company_name = self._job_tag.find_element_by_class_name("jobHeader").text
         job_location = self._job_tag.find_element_by_class_name('loc').text.split(',')
         self.job_city = job_location[0]
-        self.job_state = job_location[1]
+        self.job_state = job_location[1] if len(job_location) > 1 else np.nan
         self.job_title = self._job_tag.find_element_by_class_name('jobTitle').text
 
         self._get_salary_range()
