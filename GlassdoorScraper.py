@@ -17,6 +17,7 @@ import time
 import csv
 import sys
 import re
+import requests
 
 logging.basicConfig(filename="glassdoor_scraping.log",
                     format='%(asctime)s-%(levelname)s-FUNC:%(funcName)s-LINE:%(lineno)d-%(message)s',
@@ -503,6 +504,16 @@ class DatabaseManager:
 
         crate_table_commands["Company"] = company
 
+        company_stock_details = '''
+               CREATE TABLE Company_stock_details(idCompany_stock_details INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+                                    Stock_price FLOAT, 
+                                    Market_cap FLOAT,
+                                    Currency VARCHAR(10), 
+                                    Website TEXT, 
+                                    FOREIGN KEY(idCompany) REFERENCES Company(idCompany))'''
+
+        crate_table_commands["Company_stock_details"] = company_stock_details
+
         job_post = '''
         CREATE TABLE Job_post(idJob_post INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
                               Title TEXT NOT NULL, 
@@ -620,7 +631,8 @@ class DatabaseManager:
                                                        Max_Size, 
                                                        Revenue_est, 
                                                        Industry, 
-                                                       idRatings) 
+                                                       idRatings
+                                                       ) 
                                   VALUES (%s, %s, %s, %s, %s, %s)''',
                                (line[1], line[7], line[8], line[9], line[10], idRatings))
 
