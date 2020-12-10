@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium import webdriver
 from pathlib import Path
-import mysql.connector
+from Database import *
 import pandas as pd
 import numpy as np
 import argparse
@@ -14,16 +14,20 @@ import logging
 import random
 import json
 import time
-import csv
 import sys
 import re
-import requests
 
-logging.basicConfig(filename="glassdoor_scraping.log",
-                    format='%(asctime)s-%(levelname)s-FUNC:%(funcName)s-LINE:%(lineno)d-%(message)s',
-                    level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
-BASE_URL = "https://www.glassdoor.com/Job/palo-alto-data-scientist-jobs-SRCH_IL.0,9_IC1147434_KO10,24.htm"
+file_handler = logging.FileHandler('glassdoor_scraping.log', encoding='utf8')
+file_handler.setLevel(logging.DEBUG)
+
+file_format = logging.Formatter("'%(asctime)s - %(levelname)s - In: %(filename)s - LINE: %(lineno)d - %(funcName)s- "
+                                "-%(message)s'")
+file_handler.setFormatter(file_format)
+
+logger.addHandler(file_handler)
 
 
 def retry(func):
@@ -35,20 +39,20 @@ def retry(func):
     def func_wrapper(*args, **kwargs):
         try_number = 1
         while try_number <= 3:
-            logging.info(f"Executing {func.__name__}, try number: {try_number}")
+            logger.info(f"Executing {func.__name__}, try number: {try_number}")
             try:
                 return func(*args, **kwargs)
             except TimeoutException:
-                logging.warning(f"TimeoutException occurred when executing the function: {func.__name__}")
+                logger.warning(f"TimeoutException occurred when executing the function: {func.__name__}")
             except StaleElementReferenceException:
-                logging.warning(f"StaleElementReferenceException when executing the function: {func.__name__}")
+                logger.warning(f"StaleElementReferenceException when executing the function: {func.__name__}")
             except Exception as e:
-                logging.warning(f"Exception was thrown when executing the function {func.__name__}\n"
+                logger.warning(f"Exception was thrown when executing the function {func.__name__}\n"
                                 f"{e}")
 
             try_number += 1
         else:
-            logging.error(f"Was trying to execute {func.__name__} {try_number} times but FAILED")
+            logger.error(f"Was trying to execute {func.__name__} {try_number} times but FAILED")
             raise ValueError("Apparently no such element on page or something is missing")
 
     return func_wrapper
@@ -56,11 +60,12 @@ def retry(func):
 
 class ScraperManager:
 
-    def __init__(self, path, driver_filename, job_title, job_location, rating_filter, number_of_jobs, headless):
+    def __init__(self, path, driver_filename, job_title, job_location, rating_filter, number_of_jobs, headless,
+                 baseurl):
         """
         Construct ScraperManager instance with user CLI arguments
         """
-        logging.info(f"Creating ScraperManager with the following parameters:\n"
+        logger.info(f"Creating ScraperManager with the following parameters:\n"
                      f"path: {path}, driver: {driver_filename}, job: {job_title},\n"
                      f"loc: {job_location}, rating: {rating_filter}, jobs: {number_of_jobs}")
 
@@ -82,11 +87,12 @@ class ScraperManager:
                                  'Min Company Size', 'Max Company Size',
                                  'Revenue', 'Industry']
 
-        self._title = job_title
-        self._location = job_location
+        self._title = job_title if job_title else ' '
+        self._location = job_location if job_location else ' '
         self._res_path = path
         self.rating_filter = rating_filter
         self._headless = headless
+        self.base_url = baseurl
 
         self._driver_path = driver_filename
         self.driver = self._init_driver()
@@ -99,7 +105,7 @@ class ScraperManager:
         else:
             self._num_of_jobs = self._total_jobs_found
 
-        logging.info(f"Successfully constructed ScraperManager instance\n"
+        logger.info(f"Successfully constructed ScraperManager instance\n"
                      f"Search total pages: {self._total_pages},\n"
                      f"Search total jobs: {self._num_of_jobs}\n")
 
@@ -124,7 +130,7 @@ class ScraperManager:
         Initiating Chromedriver instance for interacting with the website
         Being used as soon as ScraperManager object created (in the __init__ function)
         """
-        logging.info("Initiating Chromedriver instance")
+        logger.info("Initiating Chromedriver instance")
 
         options = webdriver.ChromeOptions()
         options.add_argument('--ignore-certificate-errors')
@@ -139,9 +145,9 @@ class ScraperManager:
             raise IOError("Make sure you are using proper chrome driver\n"
                           "and/or you've inserted its name properly (including the file suffix if needed)")
 
-        driver.get(BASE_URL)
+        driver.get(self.base_url)
 
-        logging.info("Successfully created Chromedriver instance")
+        logger.info("Successfully created Chromedriver instance")
 
         self._bypass_login(driver)
 
@@ -153,7 +159,7 @@ class ScraperManager:
         Bypass the signup/login pop-up (if present)
         Used as part of the Chromedriver initialization (in the _init_driver() function)
         """
-        logging.info("Bypassing the 'sign in' pop up")
+        logger.info("Bypassing the 'sign in' pop up")
 
         try:
             driver.find_element_by_class_name("selected").click()
@@ -165,14 +171,14 @@ class ScraperManager:
         except NoSuchElementException:
             pass
 
-        logging.info("Successfully bypassed the pop up")
+        logger.info("Successfully bypassed the pop up")
 
     def _input_search_params(self):
         """
         Establishes website interaction for inserting the user's search parameters
         Being used in the __init__() function
         """
-        logging.info(f"Inserting search parameters: \n"
+        logger.info(f"Inserting search parameters: \n"
                      f"job: {self._title}, location: {self._location}")
 
         self.driver.find_element_by_xpath('.//input[@name="sc.keyword"]').clear()
@@ -186,7 +192,7 @@ class ScraperManager:
         time.sleep(random.uniform(1, 1.5))
         self.driver.find_element_by_xpath('.//button[@id="HeroSearchButton"]').click()
 
-        logging.info("Successfully inserted search parameters")
+        logger.info("Successfully inserted search parameters")
 
     @retry
     def _get_amount(self, of_what) -> int:
@@ -209,7 +215,7 @@ class ScraperManager:
         match = re.search(pattern, raw_number)
 
         if match is None:
-            logging.warning("Search criteria doesn't satisfied")
+            logger.warning("Search criteria doesn't satisfied")
             raise StopIteration("Your search criteria doesn't satisfied\n"
                                 "Consider changing it")
 
@@ -222,9 +228,9 @@ class ScraperManager:
         Gets all the jobs listing in a certain search page
         Used in the main() function
         """
-        logging.debug("Searching for jobs in page")
+        logger.debug("Searching for jobs in page")
         jobs = self.driver.find_elements_by_class_name("jl")
-        logging.debug(f"Found overall {len(jobs)} jobs on page")
+        logger.debug(f"Found overall {len(jobs)} jobs on page")
 
         return jobs
 
@@ -255,7 +261,7 @@ class ScraperManager:
         Being used in main()
         :param job_obj: Job instance
         """
-        logging.info("Filling the jobs info data structure")
+        logger.info("Filling the jobs info data structure")
 
         self.jobs_data['Company'].append(job_obj.company_name)
         self.jobs_data['City'].append(job_obj.job_city)
@@ -268,7 +274,7 @@ class ScraperManager:
         self.jobs_data['Revenue'].append(job_obj.company_revenue)
         self.jobs_data['Industry'].append(job_obj.company_industry)
 
-        logging.info("Done filling the jobs info data structure")
+        logger.info("Done filling the jobs info data structure")
 
     def update_nans(self):
         """
@@ -368,7 +374,7 @@ class Job:
         Extract common job parameters: company name, city, state, job title and salary
         Used in main() function
         """
-        logging.info("Extracting job information")
+        logger.info("Extracting job information")
 
         self.company_name = self._job_tag.find_element_by_class_name("jobHeader").text
         job_location = self._job_tag.find_element_by_class_name('loc').text.split(',')
@@ -383,7 +389,7 @@ class Job:
         except NoSuchElementException:
             pass
 
-        logging.info(f"Successfully extracted job's information:\n"
+        logger.info(f"Successfully extracted job's information:\n"
                      f"Job: {self.job_title}, Company name: {self.company_name}\n"
                      f"City: {self.job_city}, State: {self.job_state}\n"
                      f"Minimum Salary: {self.job_min_salary}, Maximum Salary: {self.job_max_salary}")
@@ -409,7 +415,7 @@ class Job:
         appears in other job web-page.
         Used in main()
         """
-        logging.info("Extracting more Job's features")
+        logger.info("Extracting more Job's features")
         try:
             company_size = self._driver.find_element_by_xpath(
                 './/div[@class="infoEntity"]/label[text()="Size"]/following-sibling::*').text
@@ -421,7 +427,7 @@ class Job:
         except NoSuchElementException:
             pass
         except Exception as e:
-            logging.warning(f"Received exception: {e}")
+            logger.warning(f"Received exception: {e}")
             self.min_company_size = '10000'
             self.max_company_size = '100000'
 
@@ -437,7 +443,7 @@ class Job:
         except NoSuchElementException:
             pass
 
-        logging.info(f"Successfully extracted additional job's info\n"
+        logger.info(f"Successfully extracted additional job's info\n"
                      f"Company size: {self.min_company_size} - {self.max_company_size}\n"
                      f"Industry: {self.company_industry}\n"
                      f"Revenue: {self.company_revenue}")
@@ -449,7 +455,7 @@ class Job:
         Scraps for the ratings fields and their scores anc calculates the overall rating.
         Eventually, stores all the information in ratings_dict
         """
-        logging.info("Scraping for Ratings scores")
+        logger.info("Scraping for Ratings scores")
 
         raw_rating_parameters = self._driver.find_elements_by_xpath(
             './/div[@class="stars"]/ul/li/span[@class="ratingType"]')
@@ -467,217 +473,8 @@ class Job:
 
             self.ratings['Overall Rating'] = overall_rating
 
-        logging.info(f"Done scraping for ratings\n"
+        logger.info(f"Done scraping for ratings\n"
                      f"The Ratings scores are: {self.ratings}")
-
-
-class DatabaseManager:
-
-    @staticmethod
-    def construct_create_table_commands():
-        """
-        Construct mySQL commands for creating the tables in the database
-        """
-        logging.info("Constructing mySQL commands for creating tables")
-        crate_table_commands = {}
-
-        job_ratings = '''CREATE TABLE Ratings(idRatings INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                                              Culture_values FLOAT, 
-                                              Diversity_inclusion FLOAT,
-                                              Work_life_balance FLOAT,
-                                              Senior_management FLOAT, 
-                                              Benefits FLOAT,
-                                              Career_opportunities FLOAT, 
-                                              Overall_rating FLOAT)'''
-
-        crate_table_commands["Ratings"] = job_ratings
-
-        company = '''
-        CREATE TABLE Company(idCompany INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-                             Company_name VARCHAR(45) NOT NULL, 
-                             Min_Size INT,
-                             Max_Size INT, 
-                             Revenue_est TEXT, 
-                             Industry VARCHAR(50), 
-                             idRatings INT, 
-                             FOREIGN KEY(idRatings) REFERENCES Ratings(idRatings))'''
-
-        crate_table_commands["Company"] = company
-
-        company_stock_details = '''
-               CREATE TABLE Company_stock_details(idCompany_stock_details INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-                                    Stock_price FLOAT, 
-                                    Market_cap FLOAT,
-                                    Currency VARCHAR(10), 
-                                    Website TEXT, 
-                                    FOREIGN KEY(idCompany) REFERENCES Company(idCompany))'''
-
-        crate_table_commands["Company_stock_details"] = company_stock_details
-
-        job_post = '''
-        CREATE TABLE Job_post(idJob_post INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-                              Title TEXT NOT NULL, 
-                              Min_Salary VARCHAR(10),
-                              Max_Salary VARCHAR(10), 
-                              idCompany INT, 
-                              FOREIGN KEY (idCompany) REFERENCES Company(idCompany))'''
-
-        crate_table_commands["Job_post"] = job_post
-
-        job_location = '''
-        CREATE TABLE Job_location(idJob_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-                                  City VARCHAR(45), 
-                                  State VARCHAR(10))'''
-
-        crate_table_commands["Job_location"] = job_location
-
-        job_post_location = '''
-        CREATE TABLE Job_post_location(idJob_post_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY,  
-                                       idJob_post INT,
-                                       idJob_location INT,
-                                       FOREIGN KEY (idJob_post) REFERENCES Job_post(idJob_post),
-                                       FOREIGN KEY (idJob_location) REFERENCES Job_location(idJob_location))'''
-
-        crate_table_commands["Job_post_location"] = job_post_location
-
-        logging.info("Done constructing tables commands")
-
-        return crate_table_commands
-
-    @staticmethod
-    def create_database(host, username, password, db_name):
-        """
-        Create new mySQL database (if not exists yet)
-        """
-        logging.info("Establishing mySQL connection")
-        my_db = mysql.connector.connect(host=host, user=username, passwd=password)
-        cursor = my_db.cursor()
-        logging.info("Connection established successfully")
-
-        cursor.execute("SHOW DATABASES")
-        databases = cursor.fetchall()
-        if (db_name.lower(),) not in databases:
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
-            my_db.commit()
-            cursor.execute("SHOW DATABASES")
-            databases = cursor.fetchall()
-            if (db_name.lower(),) in databases:
-                logging.info(f"Successfully created {db_name} Database")
-            else:
-                logging.error("Could not create Database")
-
-            cursor.close()
-            my_db.close()
-            logging.info("mySQL connection closed")
-
-    @staticmethod
-    def create_tables(host, username, password, db_name, create_table_commands):
-        """
-        Based on the returned value from construct_create_table_commands() function,
-        execute mySQL commands for creating the tables inside the db_name database
-        :param create_table_commands - Dict with table names as keys, and mySQL 'create table'
-                                       command as values
-        """
-        logging.info("Establishing mySQL connection")
-        my_db = mysql.connector.connect(host=host, user=username, passwd=password, database=db_name)
-        cursor = my_db.cursor()
-        logging.info("Connection established successfully")
-
-        cursor.execute(f"SHOW TABLES IN {db_name}")
-        existing_tables = cursor.fetchall()
-        for table_name, crate_command in create_table_commands.items():
-            if (table_name.lower(),) not in existing_tables:
-                cursor.execute(crate_command)
-                logging.info(f"Creating {table_name} table")
-                my_db.commit()
-                logging.info(f"{table_name} created successfully")
-
-        cursor.close()
-        my_db.close()
-        logging.info("mySQL connection closed")
-
-    @staticmethod
-    def insert_values(host, username, password, db_name, data_file, num_of_jobs):
-        """
-        Reads data from a given data_file and inserts its values to the tables in db_name
-        """
-        logging.info("Establishing mySQL connection")
-        my_db = mysql.connector.connect(host=host, user=username, passwd=password, database=db_name)
-        cursor = my_db.cursor()
-        logging.info("Connection established successfully")
-
-        # Extracting relevant data from the csv file
-        with open(fr"{data_file}", 'r') as f:
-            reader = csv.reader(f)
-            headers = next(reader)
-
-            for line_num, line in enumerate(reader):
-                line = DatabaseManager.replace_nans(line)
-                ratings_data = line[11:]
-
-                cursor.execute('''INSERT INTO Ratings (Culture_values, 
-                                                       Diversity_inclusion,
-                                                       Work_life_balance,  
-                                                       Senior_management,
-                                                       Benefits,
-                                                       Career_opportunities,
-                                                       Overall_rating)
-                                 VALUES (%s, %s, %s, %s, %s, %s, %s )''', ratings_data)
-
-                idRatings = cursor.lastrowid
-
-                cursor.execute('''INSERT INTO Company (Company_name,
-                                                       Min_Size, 
-                                                       Max_Size, 
-                                                       Revenue_est, 
-                                                       Industry, 
-                                                       idRatings
-                                                       ) 
-                                  VALUES (%s, %s, %s, %s, %s, %s)''',
-                               (line[1], line[7], line[8], line[9], line[10], idRatings))
-
-                idCompany = cursor.lastrowid
-
-                cursor.execute('''INSERT INTO Job_post (Title, 
-                                                        Min_Salary, 
-                                                        Max_Salary, 
-                                                        idCompany)
-                                  VALUES (%s, %s, %s, %s)''', (line[4], line[5], line[6], idCompany))
-
-                idJob_post = cursor.lastrowid
-
-                cursor.execute('''INSERT INTO Job_location (City, State) 
-                                  VALUES (%s, %s)''', (line[2], line[3]))
-
-                idJob_location = cursor.lastrowid
-
-                cursor.execute('''INSERT INTO Job_post_location (idJob_post, idJob_location) 
-                                  VALUES (%s, %s)''', (idJob_post, idJob_location))
-
-                if num_of_jobs <= 10:
-                    logging.info("Committing changes")
-                    my_db.commit()
-                    logging.info("Done committing changes")
-                elif num_of_jobs % 15 == 0:
-                    logging.info("Committing changes")
-                    my_db.commit()
-                    logging.info("Done committing changes")
-
-        my_db.commit()
-        cursor.close()
-        my_db.close()
-        logging.info("Connection established successfully")
-
-    @staticmethod
-    def replace_nans(val_list):
-        """
-        Replace missing values with nans.
-        Making it easier for the mySQL to handle with.
-        An auxiliary function to insert_values()
-        """
-        fixed_list = [item if item != '' else None for item in val_list]
-
-        return fixed_list
 
 
 def parse_args():
@@ -690,11 +487,14 @@ def parse_args():
     Before we begin, please make sure you have placed the Chrome driver within the same
     directory of the this script file and that you've updated the config.json file accordingly.
     Chrome driver can be found at the following URL:
-    https://chromedriver.storage.googleapis.com/index.html?path=87.0.4280.20/ 
+    https://chromedriver.storage.googleapis.com/index.html?path=87.0.4280.20/
+    When passing the --api flag by its own, meaning you won't scrap Glassdoor, but only
+    get data from the public API.
+    ATTENTION: You should use this option (passing --api flag by its own) only if you certain
+    your glassdoor database exists! 
     """
 
-    usage = """%(prog)s [-h] [-l] [-jt] [-n] [--db-username/-dbu] [--db-password/-dbp] [--db-name/-dbn] [
-    --headless/-hl] [--verbose/-v] """
+    usage = """%(prog)s [-h] [-l] [-jt] [-n] [--api] [--headless/-hl] [--verbose/-v] """
 
     parser = argparse.ArgumentParser(description=desc,
                                      prog='GlassdoorScraper.py',
@@ -703,13 +503,13 @@ def parse_args():
                                             "directory of this script!",
                                      fromfile_prefix_chars='@')
 
-    parser.add_argument('-l', '--location', action='store', default=' ', type=str,
+    parser.add_argument('-l', '--location', action='store', default=False, type=str,
                         help="Job Location")
 
-    parser.add_argument('-jt', '--job_type', action='store', default=' ', type=str,
+    parser.add_argument('-jt', '--job_type', action='store', default=False, type=str,
                         help='Job Title')
 
-    parser.add_argument('-n', '--number_of_jobs' , action='store', type=int, default=None,
+    parser.add_argument('-n', '--number_of_jobs', action='store', type=int, default=None,
                         help="Amount of jobs to scrap, "
                              "if you'll insert 'n' greater than amount of jobs found\n"
                              "the scraper will simply scrap whatever it founds, obviously")
@@ -717,17 +517,8 @@ def parse_args():
     parser.add_argument('-rt', '--rating_threshold', action='store', type=float, default=0,
                         help="Get jobs info above certain overall rating threshold")
 
-    parser.add_argument('-dbu', '--db-username', action='store', type=str, required=True,
-                        help="Your database user name",
-                        metavar="DB_USERNAME")
-
-    parser.add_argument('-dbp', '--db-password', action='store', required=True, type=str,
-                        help="Your database login password",
-                        metavar="DB_PASSWORD")
-
-    parser.add_argument('-dbn', '--db-name', action='store', type=str, default="GlassdoorDB",
-                        help="Choose database name as you wish (optional)",
-                        metavar="DB_NAME")
+    parser.add_argument('--api', action='store_true',
+                        help="Choose whether query also from a public Free Stocks API")
 
     parser.add_argument("-hl", "--headless", action='store_true',
                         help="Choose whether or not displaying the google chrome window while scraping")
@@ -748,6 +539,16 @@ def parse_args():
     return args
 
 
+def check_arguments(args):
+
+    trues = []
+    for arg in vars(args):
+        arg_val = getattr(args, arg)
+        if arg_val and arg not in ['headless', 'verbose']:
+            trues.append(arg)
+    return trues
+
+
 def main():
     """
     The scarping begins here!
@@ -756,114 +557,115 @@ def main():
     whereas Job extract information regarding specific job
     """
     args = parse_args()
+    trues_args = check_arguments(args)
 
-    with open('config.json') as config_file:
-        configurations = json.load(config_file)
+    # In case only the --api flag was passed
+    if len(trues_args) == 1 and trues_args[0] == 'api':
+        create_api_table()
+        insert_values(where_from='api')
 
-    chromedriver_path = configurations['chromedriver']
-    results_path = configurations['results_path']
+    else:
 
-    try:
-        sm = ScraperManager(path=results_path, driver_filename=chromedriver_path,
-                            job_title=args.job_type, job_location=args.location,
-                            rating_filter=args.rating_threshold, number_of_jobs=args.number_of_jobs,
-                            headless=args.headless)
-    except IOError as e:
-        logging.error(f"Failed due to: {e}")
-        sys.exit(1)
-    except StopIteration as e:
-        logging.error(f"Failed due to: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(e)
-        logging.error(f"Failed due to: {e}")
-        sys.exit(1)
+        with open('config.json') as config_file:
+            configurations = json.load(config_file)
 
-    job_id = 0
-    while job_id < sm.num_of_jobs:
+        chromedriver_path = configurations['Scraping']['chromedriver']
+        results_path = configurations['Scraping']['results_path']
+        base_url = configurations['Scraping']['base_url']
 
-        jobs = sm.find_jobs_on_page()
+        try:
+            sm = ScraperManager(path=results_path, driver_filename=chromedriver_path,
+                                job_title=args.job_type, job_location=args.location,
+                                rating_filter=args.rating_threshold, number_of_jobs=args.number_of_jobs,
+                                headless=args.headless, baseurl=base_url)
+        except IOError as e:
+            logger.error(f"Failed due to: {e}")
+            sys.exit(1)
+        except StopIteration as e:
+            logger.error(f"Failed due to: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(e)
+            logger.error(f"Failed due to: {e}")
+            sys.exit(1)
 
-        for job in jobs:
+        job_id = 0
+        while job_id < sm.num_of_jobs:
 
-            job_obj = Job(job, sm.driver)
-            job_obj.click()
+            jobs = sm.find_jobs_on_page()
 
-            if job_id >= sm.num_of_jobs:
-                break
+            for job in jobs:
 
-            try:
-                job_obj.get_common_params()
-            except Exception as e:
-                print(f"Failed due to {e}")
-                sm.driver.close()
-                sys.exit(1)
+                job_obj = Job(job, sm.driver)
+                job_obj.click()
 
-            if (job_obj.overall_rating >= args.rating_threshold) or \
-                    (np.isnan(job_obj.overall_rating) and args.rating_threshold == 0):
-
-                logging.info(f"Scraping job number {job_id + 1} out of {sm.num_of_jobs}")
-
-                if args.verbose:
-                    print(
-                        f"@@ Scrap job number {job_id + 1} out of {sm.num_of_jobs}: {(job_id + 1) / sm.num_of_jobs:.2%} @@")
-                    print(f"\tCompany Name: {job_obj.company_name}\n"
-                          f"\tJob title: {job_obj.job_title}\n"
-                          f"\tCity: {job_obj.job_city}\n"
-                          f"\tState: {job_obj.job_state}\n"
-                          f"\tSalary: {job_obj.job_min_salary}-{job_obj.job_max_salary}")
+                if job_id >= sm.num_of_jobs:
+                    break
 
                 try:
-                    sm.click_tab('company')
-                except ValueError:
-                    pass
-                finally:
-                    job_obj.get_non_common_params()
+                    job_obj.get_common_params()
+                except Exception as e:
+                    print(f"Failed due to {e}")
+                    sm.driver.close()
+                    sys.exit(1)
 
-                if args.verbose:
-                    print(f"\tCompany Size: {job_obj.min_company_size} to {job_obj.max_company_size}")
-                    print(f"\tIndustry: {job_obj.company_industry}\n")
+                if (job_obj.overall_rating >= args.rating_threshold) or \
+                        (np.isnan(job_obj.overall_rating) and args.rating_threshold == 0):
 
-                sm.fill_dict(job_obj)
+                    logger.info(f"Scraping job number {job_id + 1} out of {sm.num_of_jobs}")
 
-                logging.info("Generating the Ratings dict")
-                try:
-                    sm.click_tab('rating')
-                except ValueError:
-                    sm.update_nans()
-                else:
-                    job_obj.get_ratings_scores()
-                    sm.update_jobs_data(job_obj.ratings)
-                logging.info("Done generate the ratings dict")
+                    if args.verbose:
+                        print(
+                            f"@@ Scrap job number {job_id + 1} out of {sm.num_of_jobs}: {(job_id + 1) / sm.num_of_jobs:.2%} @@")
+                        print(f"\tCompany Name: {job_obj.company_name}\n"
+                              f"\tJob title: {job_obj.job_title}\n"
+                              f"\tCity: {job_obj.job_city}\n"
+                              f"\tState: {job_obj.job_state}\n"
+                              f"\tSalary: {job_obj.job_min_salary}-{job_obj.job_max_salary}")
 
-                job_id += 1
+                    try:
+                        sm.click_tab('company')
+                    except ValueError:
+                        pass
+                    finally:
+                        job_obj.get_non_common_params()
 
-        sm.click_tab('next')
+                    if args.verbose:
+                        print(f"\tCompany Size: {job_obj.min_company_size} to {job_obj.max_company_size}")
+                        print(f"\tIndustry: {job_obj.company_industry}\n")
 
-    sm.create_dataframe()
-    sm.save_results()
-    logging.info("Done Scraping!")
+                    sm.fill_dict(job_obj)
 
-    #### Creating the Database ###
+                    logger.info("Generating the Ratings dict")
+                    try:
+                        sm.click_tab('rating')
+                    except ValueError:
+                        sm.update_nans()
+                    else:
+                        job_obj.get_ratings_scores()
+                        sm.update_jobs_data(job_obj.ratings)
+                    logger.info("Done generate the ratings dict")
 
-    createTables_commands = DatabaseManager.construct_create_table_commands()
+                    job_id += 1
 
-    db_host = configurations['database_host']
-    db_username = args.db_username
-    db_password = args.db_password
-    db_name = args.db_name
-    jobs = sm.num_of_jobs
+            sm.click_tab('next')
 
-    DatabaseManager.create_database(db_host, username=db_username, password=db_password, db_name=db_name)
+        sm.create_dataframe()
+        sm.save_results()
+        logger.info("Done Scraping!")
 
-    DatabaseManager.create_tables(db_host, username=db_username, password=db_password, db_name=db_name,
-                                  create_table_commands=createTables_commands)
+        """Creating the Database"""
+        create_database()
+        create_scarping_tables()
+        insert_values(where_from='file')
 
-    DatabaseManager.insert_values(db_host, username=db_username, password=db_password, db_name=db_name,
-                                  data_file=results_path, num_of_jobs=jobs)
+        if args.api:
+            create_api_table()
+            insert_values(where_from='api')
 
 
 if __name__ == "__main__":
     main()
-
-
+    # create_database()
+    # create_scarping_tables()
+    # insert_values(where_from='file')
