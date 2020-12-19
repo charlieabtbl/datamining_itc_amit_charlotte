@@ -10,11 +10,13 @@ from Database import *
 import pandas as pd
 import numpy as np
 import argparse
+import pathlib
 import logging
 import random
 import json
 import time
 import sys
+import os
 import re
 
 logger = logging.getLogger(__name__)
@@ -139,8 +141,10 @@ class ScraperManager:
             options.add_argument('--headless')
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         driver_path = Path.cwd().joinpath(self._driver_path)
+        if isinstance(driver_path, pathlib.WindowsPath):
+            driver_path = driver_path.with_suffix(".exe")
         try:
-            driver = webdriver.Chrome(executable_path=str(driver_path), options=options)
+            driver = webdriver.Chrome(executable_path=driver_path.as_posix(), options=options)
         except WebDriverException:
             raise IOError("Make sure you are using proper chrome driver\n"
                           "and/or you've inserted its name properly (including the file suffix if needed)")
@@ -330,9 +334,17 @@ class ScraperManager:
 
     def save_results(self):
         """
-        After creating pandas DataFrame, save it to a CSV file
+        Save scraping result to CSV file
         """
-        self._df.to_csv(self._res_path)
+        if os.path.exists(self._res_path):
+            os.remove(self._res_path)
+
+        with open(self._res_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(self.jobs_data.keys())
+            writer.writerows(zip(*self.jobs_data.values()))
+
+        # self._df.to_csv(self._res_path)
 
 
 class Job:
