@@ -6,3 +6,4 @@ requests~=2.24.0
 mysql-connector-python~=8.0.22
 numpy~=1.19.4
 selenium~=3.141.0
+beautifulsoup4~=4.9.3
