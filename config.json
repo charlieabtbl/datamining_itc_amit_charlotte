@@ -1,21 +1,15 @@
 {
 	"Scraping": {
-		"operating_system": "os",
 		"chromedriver": "chromedriver",
-		"results_path": "Scraping_results.csv",
+		"results_path": "Companies.csv",
 		"base_url": "https://www.glassdoor.com/Job/palo-alto-data-scientist-jobs-SRCH_IL.0,9_IC1147434_KO10,24.htm"
 	},
 
 	"Database": {
 		"host": "localhost",
 		"username": "root",
-		"password": "password",
-		"database_name": "GlassDoor"
-	},
-
-	"API": {
-		"search": "https://stock-exchange-dot-full-stack-course-services.ew.r.appspot.com/api/v3/search",
-		"profile": "https://stock-exchange-dot-full-stack-course-services.ew.r.appspot.com/api/v3/profile/"
+		"password": "*",
+		"database_name": "*"
 	}
 
 }
