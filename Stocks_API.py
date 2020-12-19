@@ -2,7 +2,7 @@ import requests
 import logging
 import json
 
-logger = logging.getLogger('glassdoor_scraping.log')
+logger = logging.getLogger(__name__)
 SEARCH = "https://stock-exchange-dot-full-stack-course-services.ew.r.appspot.com/api/v3/search"
 PROFILE = "https://stock-exchange-dot-full-stack-course-services.ew.r.appspot.com/api/v3/profile/"
 
