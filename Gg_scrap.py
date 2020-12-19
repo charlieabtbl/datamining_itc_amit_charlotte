@@ -38,6 +38,10 @@ logger.addHandler(file_handler)
 
 
 def parse_json():
+    """
+    Parse JSON configuration file
+    return: python dictionary
+    """
 
     with open(Path.cwd().joinpath('config.json').as_posix()) as json_file:
         configurations = json.load(json_file)
@@ -45,29 +49,12 @@ def parse_json():
     return configurations
 
 
-def get_chromedriver_path(configurations):
-
-    # Get Driver Path
-    driver_path = Path.cwd().joinpath(configurations['Scraping']['chromedriver'])
-    if isinstance(driver_path, pathlib.WindowsPath):
-        if len(driver_path.as_posix().split('.')) > 1:
-            if driver_path.as_posix().split('.')[1] == 'exe':
-                driver_path = driver_path.as_posix()
-            else:
-                raise IOError("Check your chromedriver file suffix")
-        else:
-            driver_path = driver_path.with_suffix(".exe").as_posix()
-    else:
-        driver_path = driver_path.as_posix()
-
-    return driver_path
-
-
 def parse_args():
     """
     Parse CLI user arguments.
     Being used in main()
     """
+    logger.info("Parse user CLI parameters")
 
     desc = """ You are about to scrap the GlassDoor jobs search platform.
     Before we begin, please make sure you have placed the Chrome driver within the same
@@ -114,90 +101,39 @@ def parse_args():
 
     args = parser.parse_args()
 
+    logger.info("Parsed successfully")
+
     return args
 
 
 def main():
-
-    general_data = []
-    company_tab_data = []
-    ratings_tab_data = []
-
+    """
+    The scarping begins here!
+    Uses function from the Scraping_handler module (imported above)
+    Exceptions thrown in the craping_handler module module, bubbled and caught here
+    """
+    logger.info("Scraping began")
     args = parse_args()
     configurations = parse_json()
     try:
-        driver_path = get_chromedriver_path(configurations)
+        general_data, company_tab_data, ratings_tab_data = do_scraping(args, configurations)
     except IOError as e:
         print(e)
+        logger.error(f"===Something went wrong: {e}===")
         sys.exit(1)
-
-    driver = initiate_driver(driver_path, args)
-    try:
-        jobs_found = get_num_of_matched_jobs(driver)
     except ValueError as e:
+        logger.error(f"===Something went wrong: {e}===")
         print(e)
-        driver.close()
         sys.exit(1)
-
-    jobs_to_scrap = min(args.number_of_jobs, jobs_found) if args.number_of_jobs else jobs_found
-
-    job_id = 1
-    while len(general_data) < jobs_to_scrap:
-        # Jobs on specific page
-        jobs_list = driver.find_elements_by_class_name("jl")
-        page_content = BeautifulSoup(driver.page_source, "html.parser")
-        bs_jobs_list = page_content.find_all("li", class_="jl")
-        for idx, job in enumerate(jobs_list, start=1):
-            if len(general_data) == jobs_to_scrap:
-                break
-            print("Job number: ", job_id)
-            bs_job = bs_jobs_list[idx - 1]
-            common_data = get_common_data(bs_job)
-            general_data.append(common_data)
-
-            # Click Job
-            button = job.find_element_by_class_name("jobInfoItem")
-            driver.execute_script("arguments[0].click();", button)
-
-            time.sleep(random.uniform(1, 3))
-
-            # Get Company Data
-            job_company = get_company_data(driver)
-            company_tab_data.append(job_company)
-
-            # Get Rating Data
-            overall_rating = 0
-            job_ratings = get_rating_data(driver, bs_job)
-            ratings_tab_data.append(job_ratings)
-
-            if str(overall_rating) < str(args.rating_threshold):
-                general_data.pop()
-                ratings_tab_data.pop()
-                company_tab_data.pop()
-
-            else:
-                job_id += 1
-
-        # Click 'Next' Button
-        xpath = './/a[@data-test="pagination-next"]'
-        wait = WebDriverWait(driver, 3)
-        next_button = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
-        next_button.click()
-        time.sleep(random.uniform(1, 2))
-
-    driver.close()
 
     # Save Final Result
-    save_to_csv('comp.csv', company_tab_data, ['Size', 'Founded', 'Type', 'Industry', 'Sector', 'Revenue'])
-
-    save_to_csv('common.csv', general_data, ['Company_Name', 'Job_Title', 'City', 'State',
-                                             'Min_Salary', 'Max_Salary'])
-
-    save_to_csv('ratings.csv', ratings_tab_data, ['Overall', 'Culture & Values', 'Diversity & Inclusion',
-                                                  'Work/Life Balance', 'Senior Management', 'Comp & Benefits',
-                                                  'Career Opportunities'])
-
-    merge_csvs(configurations['Scraping']['results_path'])
+    try:
+        create_csv_res_file(company_tab_data, general_data, ratings_tab_data,
+                            configurations['Scraping']['results_path'])
+    except Exception as e:
+        print(e)
+        logger.error(f"===Something went wrong: {e}===")
+        sys.exit(1)
 
     # Create Database
     create_database(configurations)
@@ -216,6 +152,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # create_api_table()
+    # insert_values(where_from='api')
 
 
 
