@@ -6,11 +6,12 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.csv
 # Executable files
 *.exe
 *.gitignore
 .idea
+*.rar
 
 # Distribution / packaging
 .Python
