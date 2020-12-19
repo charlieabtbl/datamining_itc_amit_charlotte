@@ -32,7 +32,7 @@ def create_database(my_db, cursor, db_name, configurations, *args, **kwargs):
     """
     Create new mySQL database (if not exists yet)
     """
-
+    cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
     logger.info(f"Creating Database: {db_name}")
     cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
     my_db.commit()
