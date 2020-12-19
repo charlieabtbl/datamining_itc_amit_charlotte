@@ -1,10 +1,11 @@
 from Stocks_API import *
 import mysql.connector
+from tqdm import tqdm
 import logging
 import json
 import csv
 
-logger = logging.getLogger('glassdoor_scraping.log')
+logger = logging.getLogger(__name__)
 
 
 def connect(func):
@@ -119,6 +120,7 @@ def create_api_table():
     """
     This function creates specific table fot storing scraped data from a free public API
     """
+
     sql_query = '''CREATE TABLE IF NOT EXISTS 
                    Company_stock_details(idCompany_stock_details INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                                          idCompany INT,  
@@ -144,6 +146,7 @@ def create_table(my_db, cursor, db_name, table_name, query, *args, **kwargs):
     """
 
     cursor.execute(f"USE {db_name}")
+    cursor.execute(f"DROP TABLE IF EXISTS {db_name}")
     logger.info(f"Creating {table_name} table")
     cursor.execute(query)
     my_db.commit()
@@ -246,7 +249,7 @@ def insert_values(my_db, cursor, db_name, where_from='file'):
         sql_query = "SELECT idCompany, Company_name from company"
         cursor.execute(sql_query)
         companies = cursor.fetchall()
-        for idx, company in companies:
+        for idx, company in tqdm(companies, desc="Extracting Stocks Data", ncols=100):
 
             stock_price, market_cap, currency, website, exchange_market = extract_info_API(company[0])
             sql_query = """INSERT INTO Company_stock_details (Stock_price,
