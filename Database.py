@@ -15,7 +15,7 @@ def connect(func):
         db_connection = mysql.connector.connect(host=host, user=username, passwd=password)
         mysql_cursor = db_connection.cursor()
         logger.info("Connection established successfully")
-        mysql_cursor.execute(f"USE {db_name}")
+        # mysql_cursor.execute(f"USE {db_name}")
 
         func(db_connection, mysql_cursor, db_name, *args, **kwargs)
 
@@ -28,7 +28,7 @@ def connect(func):
 
 
 @connect
-def create_database(my_db, cursor, db_name, *args, **kwargs):
+def create_database(my_db, cursor, db_name, configurations, *args, **kwargs):
     """
     Create new mySQL database (if not exists yet)
     """
@@ -53,52 +53,59 @@ def create_scarping_tables():
     logger.info("Constructing mySQL commands for creating tables")
     crate_table_commands = {}
 
-    job_ratings = '''CREATE TABLE IF NOT EXISTS Ratings(idRatings INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                                          Culture_values FLOAT, 
-                                          Diversity_inclusion FLOAT,
-                                          Work_life_balance FLOAT,
-                                          Senior_management FLOAT, 
-                                          Benefits FLOAT,
-                                          Career_opportunities FLOAT, 
-                                          Overall_rating FLOAT)'''
+    job_ratings = '''CREATE TABLE IF NOT EXISTS Ratings(
+                                                          Overall FLOAT,
+                                                          idRatings INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                                                          `Culture & Values` FLOAT, 
+                                                          `Diversity & Inclusion` FLOAT,
+                                                          `Work/Life Balance` FLOAT,
+                                                          `Senior Management` FLOAT, 
+                                                          `Comp & Benefits` FLOAT,
+                                                          `Career Opportunities` FLOAT)'''
 
     crate_table_commands["Ratings"] = job_ratings
 
     company = '''
-    CREATE TABLE IF NOT EXISTS Company(idCompany INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-                         Company_name VARCHAR(45) NOT NULL, 
-                         Min_Size INT,
-                         Max_Size INT, 
-                         Revenue_est TEXT, 
-                         Industry VARCHAR(50), 
-                         idRatings INT, 
-                         FOREIGN KEY(idRatings) REFERENCES Ratings(idRatings))'''
+    CREATE TABLE IF NOT EXISTS Company(
+                                        idCompany INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+                                        Company_name VARCHAR(45) NOT NULL, 
+                                        Size VARCHAR(45), 
+                                        Revenue TEXT,
+                                        Sector TEXT,
+                                        Industry VARCHAR(50),
+                                        Type VARCHAR(50),
+                                        Founded INT,
+                                        idRatings INT, 
+                                        FOREIGN KEY(idRatings) REFERENCES Ratings(idRatings))'''
 
     crate_table_commands["Company"] = company
 
     job_post = '''
-    CREATE TABLE IF NOT EXISTS Job_post(idJob_post INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-                          Title TEXT NOT NULL, 
-                          Min_Salary VARCHAR(10),
-                          Max_Salary VARCHAR(10), 
-                          idCompany INT, 
-                          FOREIGN KEY (idCompany) REFERENCES Company(idCompany))'''
+    CREATE TABLE IF NOT EXISTS Job_post(
+                                        idJob_post INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+                                        Job_Title TEXT NOT NULL, 
+                                        Min_Salary VARCHAR(10),
+                                        Max_Salary VARCHAR(10), 
+                                        idCompany INT, 
+                                        FOREIGN KEY (idCompany) REFERENCES Company(idCompany))'''
 
     crate_table_commands["Job_post"] = job_post
 
     job_location = '''
-    CREATE TABLE IF NOT EXISTS Job_location(idJob_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-                              City VARCHAR(45), 
-                              State VARCHAR(10))'''
+    CREATE TABLE IF NOT EXISTS Job_location(
+                                            idJob_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+                                            City VARCHAR(45), 
+                                            State VARCHAR(10))'''
 
     crate_table_commands["Job_location"] = job_location
 
     job_post_location = '''
-    CREATE TABLE IF NOT EXISTS Job_post_location(idJob_post_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY,  
-                                   idJob_post INT,
-                                   idJob_location INT,
-                                   FOREIGN KEY (idJob_post) REFERENCES Job_post(idJob_post),
-                                   FOREIGN KEY (idJob_location) REFERENCES Job_location(idJob_location))'''
+    CREATE TABLE IF NOT EXISTS Job_post_location(
+                                                idJob_post_location INT NOT NULL AUTO_INCREMENT PRIMARY KEY,  
+                                                idJob_post INT,
+                                                idJob_location INT,
+                                                FOREIGN KEY (idJob_post) REFERENCES Job_post(idJob_post),
+                                                FOREIGN KEY (idJob_location) REFERENCES Job_location(idJob_location))'''
 
     crate_table_commands["Job_post_location"] = job_post_location
 
@@ -135,6 +142,8 @@ def create_table(my_db, cursor, db_name, table_name, query, *args, **kwargs):
     :param table_name - str - The table name you'd like to create
     :param query - mySQL query (str) to execute
     """
+
+    cursor.execute(f"USE {db_name}")
     logger.info(f"Creating {table_name} table")
     cursor.execute(query)
     my_db.commit()
@@ -174,7 +183,7 @@ def insert_values(my_db, cursor, db_name, where_from='file'):
         config_params = json.load(config_file)
 
     data_file = config_params['Scraping']['results_path']
-
+    cursor.execute(f"USE {db_name}")
     # Extracting relevant data from the csv file
     if where_from.lower() == 'file':
 
@@ -184,41 +193,44 @@ def insert_values(my_db, cursor, db_name, where_from='file'):
 
             for line_num, line in enumerate(reader):
                 line = replace_nans(line)
-                ratings_data = line[11:]
+                ratings_data = line[13:]
 
-                cursor.execute('''INSERT INTO Ratings (Culture_values, 
-                                                       Diversity_inclusion,
-                                                       Work_life_balance,  
-                                                       Senior_management,
-                                                       Benefits,
-                                                       Career_opportunities,
-                                                       Overall_rating)
+                cursor.execute('''INSERT INTO Ratings (
+                                                        Overall,
+                                                       `Culture & Values`, 
+                                                       `Diversity & Inclusion`,
+                                                       `Work/Life Balance`,  
+                                                       `Senior Management`,
+                                                       `Comp & Benefits`,
+                                                       `Career Opportunities`)
                                  VALUES (%s, %s, %s, %s, %s, %s, %s )''', ratings_data)
 
                 idRatings = cursor.lastrowid
 
                 cursor.execute('''INSERT INTO Company (Company_name,
-                                                       Min_Size, 
-                                                       Max_Size, 
-                                                       Revenue_est, 
-                                                       Industry, 
+                                                       Size, 
+                                                       Revenue,
+                                                       Sector, 
+                                                       Industry,
+                                                       Type, 
+                                                       Founded,
                                                        idRatings
                                                        ) 
-                                  VALUES (%s, %s, %s, %s, %s, %s)''',
-                               (line[1], line[7], line[8], line[9], line[10], idRatings))
+                                  VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                               (line[1], line[7], line[12], line[11], line[10], line[9], line[8], idRatings))
 
                 idCompany = cursor.lastrowid
 
-                cursor.execute('''INSERT INTO Job_post (Title, 
+                cursor.execute('''INSERT INTO Job_post (Job_Title, 
                                                         Min_Salary, 
                                                         Max_Salary, 
                                                         idCompany)
-                                  VALUES (%s, %s, %s, %s)''', (line[4], line[5], line[6], idCompany))
+                                  VALUES (%s, %s, %s, %s)''', (line[2], line[5], line[6], idCompany))
 
                 idJob_post = cursor.lastrowid
 
                 cursor.execute('''INSERT INTO Job_location (City, State) 
-                                  VALUES (%s, %s)''', (line[2], line[3]))
+                                  VALUES (%s, %s)''', (line[3], line[4]))
 
                 idJob_location = cursor.lastrowid
 
