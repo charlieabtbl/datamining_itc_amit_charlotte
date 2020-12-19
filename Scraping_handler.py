@@ -233,11 +233,13 @@ def initiate_driver(chromedriver_path, args):
     Initiating Chromedriver instance for interacting with the website
     """
     logger.info("Initiating Chrome Driver")
+
     options = webdriver.ChromeOptions()
     options.add_argument('--ignore-certificate-errors')
     options.add_argument('--incognito')
     if args.headless:
         options.add_argument('--headless')
+
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
     driver = webdriver.Chrome(executable_path=chromedriver_path,
