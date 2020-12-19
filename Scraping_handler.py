@@ -12,7 +12,7 @@ import random
 import time
 import re
 
-logger = logging.getLogger('glassdoor_scraping.log')
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://www.glassdoor.com/Job/palo-alto-data-scientist-jobs-SRCH_IL.0,9_IC1147434_KO10,24.htm"
 COMPANY_TAG = {"data-tab-type": "overview"}
@@ -303,7 +303,7 @@ def do_scraping(args, configurations):
 
     jobs_to_scrap = min(args.number_of_jobs, jobs_found) if args.number_of_jobs else jobs_found
     job_id = 1
-    pbar = tqdm(total=jobs_to_scrap)
+    pbar = tqdm(total=jobs_to_scrap, desc="Scraping progress", ncols=100)
     while len(general_data) < jobs_to_scrap:
         logger.debug("Inside the While loop")
         # Jobs on specific page
