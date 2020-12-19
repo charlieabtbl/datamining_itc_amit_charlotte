@@ -1,34 +1,18 @@
-from selenium.common.exceptions import ElementClickInterceptedException
-from selenium.common.exceptions import StaleElementReferenceException
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
-from selenium import webdriver
-from bs4 import BeautifulSoup
 from pathlib import Path
-import pandas as pd
-import requests
 import argparse
 import logging
-import pathlib
-import random
-import time
-import json
 import sys
-import csv
-import re
-import os
-from Scraping_handler import *
-from Results_handler import *
-from Database import *
+import json
+from Scraping_handler import do_scraping
+from Results_handler import create_csv_res_file
+from Database import create_database, create_scarping_tables, create_api_table, insert_values
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-file_handler = logging.FileHandler('glassdoor_scraping.log', encoding='utf8')
-file_handler.setLevel(logging.DEBUG)
+file_handler = logging.FileHandler('glassdoor_scraping.log', encoding='utf8', mode='w')
+file_handler.setLevel(logging.INFO)
 
 file_format = logging.Formatter("'%(asctime)s - %(levelname)s - In: %(filename)s - LINE: %(lineno)d - %(funcName)s- "
                                 "-%(message)s'")
@@ -67,7 +51,7 @@ def parse_args():
     your glassdoor database exists! 
     """
 
-    usage = """%(prog)s [-h] [-l] [-jt] [-n] [--api] [--headless/-hl] [--verbose/-v] """
+    usage = """%(prog)s [-h] [-l] [-jt] [-n] [--api] [--headless/-hl]"""
 
     parser = argparse.ArgumentParser(description=desc,
                                      prog='GlassdoorScraper.py',
@@ -76,10 +60,10 @@ def parse_args():
                                             "directory of this script!",
                                      fromfile_prefix_chars='@')
 
-    parser.add_argument('-l', '--location', action='store', default=False, type=str,
+    parser.add_argument('-l', '--location', action='store', default=' ', type=str,
                         help="Job Location")
 
-    parser.add_argument('-jt', '--job_type', action='store', default=False, type=str,
+    parser.add_argument('-jt', '--job_type', action='store', default=' ', type=str,
                         help='Job Title')
 
     parser.add_argument('-n', '--number_of_jobs', action='store', type=int, default=None,
@@ -95,9 +79,6 @@ def parse_args():
 
     parser.add_argument("-hl", "--headless", action='store_true',
                         help="Choose whether or not displaying the google chrome window while scraping")
-
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help="Optional - Choose either printing output to std or not")
 
     args = parser.parse_args()
 
@@ -145,16 +126,13 @@ def main():
         try:
             create_api_table()
             insert_values(where_from='api')
-            print('Done')
         except Exception as e:
+            logger.error(f"===Something went wrong: {e}===")
             print(e)
+            sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
     # create_api_table()
     # insert_values(where_from='api')
-
-
-
-
