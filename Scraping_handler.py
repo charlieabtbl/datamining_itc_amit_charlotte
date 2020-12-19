@@ -184,12 +184,21 @@ def get_rating_data(driver, bs_job):
 
 
 def initiate_driver(chromedriver_path, args):
+    USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 " \
+                 "Safari/537.36 "
 
     options = webdriver.ChromeOptions()
     options.add_argument('--ignore-certificate-errors')
     options.add_argument('--incognito')
     if args.headless:
         options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--profile-directory=Default')
+        options.add_argument("--incognito")
+        options.add_argument("--disable-plugins-discovery")
+        options.add_argument("--start-maximized")
+        options.add_argument(f'--user-agent={USER_AGENT}')
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
     driver = webdriver.Chrome(executable_path=chromedriver_path,
