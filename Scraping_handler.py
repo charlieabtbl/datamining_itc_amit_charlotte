@@ -197,7 +197,7 @@ def get_rating_data(driver, bs_job):
         driver.execute_script("arguments[0].click();", button)
         driver.execute_script("arguments[0].click();", button)
 
-        time.sleep(2)
+        time.sleep(random.uniform(1, 3))
 
         try:
             overall_rating = bs_job.find("span", class_="compactStars").text
