@@ -199,7 +199,11 @@ def get_rating_data(driver, bs_job):
 
         time.sleep(2)
 
-        overall_rating = bs_job.find("span", class_="compactStars").text
+        try:
+            overall_rating = bs_job.find("span", class_="compactStars").text
+        except AttributeError as e:
+            logger.error(f"===Could not get Overall Rating: {e}===")
+            return {}
         page_content = BeautifulSoup(driver.page_source, "html.parser")
         tab_content = page_content.find("ul", attrs={"class": "ratings"})
 
