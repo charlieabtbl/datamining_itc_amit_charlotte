@@ -1,7 +1,8 @@
 {
 	"Scraping": {
+		"Platform": "Windows",
 		"chromedriver": "chromedriver",
-		"results_path": "Companies.csv",
+		"results_path": "Companies2.csv",
 		"base_url": "https://www.glassdoor.com/Job/palo-alto-data-scientist-jobs-SRCH_IL.0,9_IC1147434_KO10,24.htm"
 	},
 
