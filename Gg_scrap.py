@@ -12,7 +12,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 file_handler = logging.FileHandler('glassdoor_scraping.log', encoding='utf8', mode='w')
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG)
 
 file_format = logging.Formatter("'%(asctime)s - %(levelname)s - In: %(filename)s - LINE: %(lineno)d - %(funcName)s- "
                                 "-%(message)s'")
