@@ -349,6 +349,7 @@ def do_scraping(args, configurations):
                 pbar.update(1)
 
         # Click 'Next' Button
+        logger.info("Moving to next page")
         xpath = './/a[@data-test="pagination-next"]'
         wait = WebDriverWait(driver, 3)
         next_button = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
