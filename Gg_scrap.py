@@ -106,6 +106,10 @@ def main():
         logger.error(f"===Something went wrong: {e}===")
         print(e)
         sys.exit(1)
+    except KeyboardInterrupt:
+        logger.critical("Program stopped - User aborted")
+        print(f"Script stack - is that why you aborted?")
+        sys.exit(1)
 
     # Save Final Result
     try:
