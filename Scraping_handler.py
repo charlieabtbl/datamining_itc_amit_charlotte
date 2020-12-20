@@ -3,6 +3,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
+from pyvirtualdisplay import Display
 from selenium import webdriver
 from bs4 import BeautifulSoup
 from tqdm import tqdm
@@ -232,11 +233,14 @@ def get_rating_data(driver, bs_job):
     return job_ratings
 
 
-def initiate_driver(chromedriver_path, args):
+def initiate_driver(chromedriver_path, platform, args):
     """
     Initiating Chromedriver instance for interacting with the website
     """
     logger.info("Initiating Chrome Driver")
+    if platform.lower() == 'linux':
+        display = Display(visible=0, size=(800, 800))
+        display.start()
 
     options = webdriver.ChromeOptions()
     options.add_argument('--ignore-certificate-errors')
@@ -297,7 +301,8 @@ def do_scraping(args, configurations):
         logger.error(e)
         raise IOError(e)
 
-    driver = initiate_driver(driver_path, args)
+    platform = configurations['Scraping']['Platform']
+    driver = initiate_driver(driver_path, platform, args)
 
     try:
         jobs_found = get_num_of_matched_jobs(driver)
