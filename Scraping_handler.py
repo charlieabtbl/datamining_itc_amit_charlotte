@@ -1,4 +1,5 @@
 from selenium.common.exceptions import ElementClickInterceptedException
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.ui import WebDriverWait
@@ -238,6 +239,7 @@ def initiate_driver(chromedriver_path, platform, args):
     Initiating Chromedriver instance for interacting with the website
     """
     logger.info("Initiating Chrome Driver")
+    print("Initiating Google Chrome Driver")
     if platform.lower() == 'linux':
         display = Display(visible=0, size=(800, 800))
         display.start()
@@ -260,6 +262,7 @@ def initiate_driver(chromedriver_path, platform, args):
     insert_search_criteria(driver, args.job_type, args.location)
 
     logger.info("Chrome Driver has been initiated successfully")
+    print("Done")
 
     return driver
 
@@ -268,6 +271,7 @@ def get_chromedriver_path(configurations):
 
     # Get Driver Path
     logger.info("Deriving Google Chrome driver file")
+
     driver_path = pathlib.Path.cwd().joinpath(configurations['Scraping']['chromedriver'])
     if isinstance(driver_path, pathlib.WindowsPath):
         if len(driver_path.as_posix().split('.')) > 1:
@@ -316,6 +320,7 @@ def do_scraping(args, configurations):
     while len(general_data) < jobs_to_scrap:
         logger.debug("Inside the While loop")
         # Jobs on specific page
+        logger.info("")
         jobs_list = driver.find_elements_by_class_name("jl")
         page_content = BeautifulSoup(driver.page_source, "html.parser")
         bs_jobs_list = page_content.find_all("li", class_="jl")
@@ -330,20 +335,27 @@ def do_scraping(args, configurations):
             general_data.append(common_data)
 
             # Click Job
-            button = job.find_element_by_class_name("jobInfoItem")
-            driver.execute_script("arguments[0].click();", button)
+            try:
+                logger.debug("Clicking the job tag")
+                button = job.find_element_by_class_name("jobInfoItem")
+                driver.execute_script("arguments[0].click();", button)
+                logger.debug("Succesfully Clicked")
+            except StaleElementReferenceException as e:
+                logger.error(f"===Encountered a problem: {e}===")
+                continue
 
             time.sleep(random.uniform(1, 3))
 
             # Get Company Data
             job_company = get_company_data(driver)
+            logger.info("Updating company_tab_data")
             company_tab_data.append(job_company)
 
             # Get Rating Data
             overall_rating = 0
             job_ratings = get_rating_data(driver, bs_job)
+            logger.info("Updating ratings_tab_data")
             ratings_tab_data.append(job_ratings)
-
             if str(overall_rating) < str(args.rating_threshold):
                 general_data.pop()
                 ratings_tab_data.pop()
@@ -351,6 +363,7 @@ def do_scraping(args, configurations):
 
             else:
                 job_id += 1
+                logger.info("Updating Progress Bar")
                 pbar.update(1)
 
         # Click 'Next' Button
